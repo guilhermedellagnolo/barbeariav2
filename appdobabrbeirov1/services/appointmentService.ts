@@ -52,9 +52,22 @@ export const generateAvailableSlots = (
             status = "bloqueado"
         }
 
-        // 3. Regra de Ocupação com overlap (Teorema da Interseção de Conjuntos)
+        // 3. Regra de Bloqueio Manual (persistido no banco com status = 'bloqueado')
+        const blockedRecord = existingAppointments.find(apt => {
+            if (apt.status !== 'bloqueado') return false
+            const apptStart = new Date(apt.data_hora).getTime()
+            const slotStart = current.getTime()
+            // Bloqueio é pontual (1 slot = 30 min), comparação exata
+            return slotStart === apptStart
+        })
+
+        if (blockedRecord && status !== "bloqueado") {
+            status = "bloqueado"
+        }
+
+        // 4. Regra de Ocupação com overlap (Teorema da Interseção de Conjuntos)
         const isOccupied = existingAppointments.some(apt => {
-            if (apt.status === 'cancelado' || apt.status === 'faltou') return false
+            if (apt.status === 'cancelado' || apt.status === 'faltou' || apt.status === 'bloqueado') return false
             const apptStart = new Date(apt.data_hora).getTime()
             const apptDuration = apt.servicos?.duracao ?? apt.servicos?.duracao_minutos ?? 30
             const apptEnd = apptStart + (apptDuration * 60000)
@@ -66,7 +79,7 @@ export const generateAvailableSlots = (
         // Busca o agendamento exato para preencher nome/telefone/serviço na UI
         const appointment = isOccupied
             ? existingAppointments.find(apt => {
-                if (apt.status === 'cancelado' || apt.status === 'faltou') return false
+                if (apt.status === 'cancelado' || apt.status === 'faltou' || apt.status === 'bloqueado') return false
                 const apptStart = new Date(apt.data_hora).getTime()
                 const apptDuration = apt.servicos?.duracao ?? apt.servicos?.duracao_minutos ?? 30
                 const apptEnd = apptStart + (apptDuration * 60000)
@@ -108,7 +121,7 @@ export const generateAvailableSlots = (
         slots.push({
             time: timeString,
             status: status as any,
-            id: appointment?.id,
+            id: appointment?.id || blockedRecord?.id,
             clientName,
             clientPhone,
             service: serviceName,
@@ -294,6 +307,111 @@ export const updateAppointmentStatus = async (
         .from('agendamentos')
         .update({ status })
         .eq('id', appointmentId)
+
+    if (error) throw error
+}
+
+// ─── Bloqueio/Desbloqueio de Slots (persistência no Supabase) ────────────────
+
+/**
+ * Bloqueia um horário inserindo um registro na tabela agendamentos
+ * com status = 'bloqueado'. Usa o barbeiro principal como referência.
+ */
+export const blockSlot = async (
+    date: Date,
+    time: string,
+    barberId: string
+): Promise<string> => {
+    const [hours, minutes] = time.split(':')
+    const slotDate = new Date(date)
+    slotDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+    const isoDate = slotDate.toISOString()
+
+    const { data, error } = await supabase
+        .from('agendamentos')
+        .insert([{
+            barbearia_id: BARBER_ID,
+            barbeiro_id: barberId,
+            data_hora: isoDate,
+            status: 'bloqueado',
+            cliente_nome: null,
+            cliente_telefone: null,
+            cliente_id: null,
+            servico_id: null,
+        }])
+        .select('id')
+        .single()
+
+    if (error) throw error
+    return data.id
+}
+
+/**
+ * Desbloqueia um horário removendo (hard delete) o registro de bloqueio.
+ * Só remove registros com status = 'bloqueado' para segurança.
+ */
+export const unblockSlot = async (appointmentId: string): Promise<void> => {
+    const { error } = await supabase
+        .from('agendamentos')
+        .delete()
+        .eq('id', appointmentId)
+        .eq('status', 'bloqueado')
+
+    if (error) throw error
+}
+
+/**
+ * Bloqueia múltiplos horários de uma vez (usado por "Bloquear Dia Inteiro").
+ * Retorna array de { time, id } para atualização otimista do estado.
+ */
+export const blockMultipleSlots = async (
+    date: Date,
+    times: string[],
+    barberId: string
+): Promise<{ time: string; id: string }[]> => {
+    if (times.length === 0) return []
+
+    const records = times.map(time => {
+        const [hours, minutes] = time.split(':')
+        const slotDate = new Date(date)
+        slotDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+        return {
+            barbearia_id: BARBER_ID,
+            barbeiro_id: barberId,
+            data_hora: slotDate.toISOString(),
+            status: 'bloqueado' as const,
+            cliente_nome: null,
+            cliente_telefone: null,
+            cliente_id: null,
+            servico_id: null,
+        }
+    })
+
+    const { data, error } = await supabase
+        .from('agendamentos')
+        .insert(records)
+        .select('id, data_hora')
+
+    if (error) throw error
+
+    return (data || []).map((row: any) => ({
+        time: new Date(row.data_hora).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        id: row.id,
+    }))
+}
+
+/**
+ * Desbloqueia múltiplos horários de uma vez (usado por "Desbloquear Dia Inteiro").
+ * Só remove registros com status = 'bloqueado'.
+ */
+export const unblockMultipleSlots = async (appointmentIds: string[]): Promise<void> => {
+    if (appointmentIds.length === 0) return
+
+    const { error } = await supabase
+        .from('agendamentos')
+        .delete()
+        .in('id', appointmentIds)
+        .eq('status', 'bloqueado')
 
     if (error) throw error
 }

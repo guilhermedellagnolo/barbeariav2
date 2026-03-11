@@ -439,12 +439,27 @@ export default function BarberApp() {
 
   const handleBloquear = async (slotIndex: number) => {
     setIsLoading(true)
+    const previousSlots = [...currentSlots]
     try {
+        // 1. Atualização otimista da UI
         const updatedSlots = [...currentSlots]
-        updatedSlots[slotIndex].status = "bloqueado"
+        updatedSlots[slotIndex] = { ...updatedSlots[slotIndex], status: "bloqueado" }
+        setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+
+        // 2. Persistir no Supabase
+        const barberId = await appointmentService.fetchMainBarberId()
+        if (!barberId) throw new Error("Barbeiro não encontrado.")
+
+        const newId = await appointmentService.blockSlot(selectedDate, currentSlots[slotIndex].time, barberId)
+
+        // 3. Atualiza o ID do slot para permitir desbloqueio posterior
+        updatedSlots[slotIndex] = { ...updatedSlots[slotIndex], id: newId }
         setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
     } catch (error) {
         console.error("Erro ao bloquear horário:", error)
+        // Reverte o estado local em caso de falha
+        setSlotsByDate({ ...slotsByDate, [dateKey]: previousSlots })
+        alert("Erro ao bloquear horário. Tente novamente.")
     } finally {
         setIsLoading(false)
     }
@@ -452,12 +467,24 @@ export default function BarberApp() {
 
   const handleDesbloquear = async (slotIndex: number) => {
     setIsLoading(true)
+    const previousSlots = [...currentSlots]
     try {
+        const slot = currentSlots[slotIndex]
+
+        // Só remove do banco se o bloqueio tiver um ID (foi persistido).
+        // Bloqueios de almoço são gerados pela engine e não possuem ID.
+        if (slot.id) {
+            await appointmentService.unblockSlot(slot.id)
+        }
+
+        // Atualiza a UI após sucesso
         const updatedSlots = [...currentSlots]
-        updatedSlots[slotIndex].status = "livre"
+        updatedSlots[slotIndex] = { ...updatedSlots[slotIndex], status: "livre", id: undefined }
         setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
     } catch (error) {
         console.error("Erro ao desbloquear horário:", error)
+        setSlotsByDate({ ...slotsByDate, [dateKey]: previousSlots })
+        alert("Erro ao desbloquear horário. Tente novamente.")
     } finally {
         setIsLoading(false)
     }
@@ -465,16 +492,37 @@ export default function BarberApp() {
 
   const handleBloquearDia = async () => {
     setIsLoading(true)
+    const previousSlots = [...currentSlots]
     try {
-        const updatedSlots = [...currentSlots]
-        updatedSlots.forEach((slot, i) => {
-            if (slot.status === "livre") {
-                updatedSlots[i].status = "bloqueado"
-            }
-        })
+        // 1. Identifica todos os slots livres para bloquear
+        const slotsToBlock = currentSlots
+            .filter(slot => slot.status === "livre")
+            .map(slot => slot.time)
+
+        if (slotsToBlock.length === 0) return
+
+        // 2. Atualização otimista da UI
+        const updatedSlots = currentSlots.map(slot =>
+            slot.status === "livre" ? { ...slot, status: "bloqueado" as const } : { ...slot }
+        )
         setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+
+        // 3. Persistir no Supabase (batch insert)
+        const barberId = await appointmentService.fetchMainBarberId()
+        if (!barberId) throw new Error("Barbeiro não encontrado.")
+
+        const results = await appointmentService.blockMultipleSlots(selectedDate, slotsToBlock, barberId)
+
+        // 4. Atualiza IDs retornados no estado local
+        const finalSlots = updatedSlots.map(slot => {
+            const match = results.find(r => r.time === slot.time)
+            return match ? { ...slot, id: match.id } : slot
+        })
+        setSlotsByDate({ ...slotsByDate, [dateKey]: finalSlots })
     } catch (error) {
         console.error("Erro ao bloquear dia:", error)
+        setSlotsByDate({ ...slotsByDate, [dateKey]: previousSlots })
+        alert("Erro ao bloquear dia inteiro. Tente novamente.")
     } finally {
         setIsLoading(false)
     }
@@ -482,16 +530,31 @@ export default function BarberApp() {
 
   const handleDesbloquearDia = async () => {
     setIsLoading(true)
+    const previousSlots = [...currentSlots]
     try {
-        const updatedSlots = [...currentSlots]
-        updatedSlots.forEach((slot, i) => {
-            if (slot.status === "bloqueado") {
-                updatedSlots[i].status = "livre"
-            }
-        })
+        // 1. Coleta IDs dos slots bloqueados manualmente (que possuem ID no banco).
+        //    Bloqueios de almoço (gerados pela engine, sem ID) são ignorados —
+        //    a engine os recriará automaticamente no próximo fetch.
+        const idsToUnblock = currentSlots
+            .filter(slot => slot.status === "bloqueado" && slot.id)
+            .map(slot => slot.id!)
+
+        // 2. Atualização otimista da UI — libera apenas os que possuem ID
+        const updatedSlots = currentSlots.map(slot =>
+            slot.status === "bloqueado" && slot.id
+                ? { ...slot, status: "livre" as const, id: undefined }
+                : { ...slot }
+        )
         setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+
+        // 3. Persistir no Supabase (batch delete)
+        if (idsToUnblock.length > 0) {
+            await appointmentService.unblockMultipleSlots(idsToUnblock)
+        }
     } catch (error) {
         console.error("Erro ao desbloquear dia:", error)
+        setSlotsByDate({ ...slotsByDate, [dateKey]: previousSlots })
+        alert("Erro ao desbloquear dia inteiro. Tente novamente.")
     } finally {
         setIsLoading(false)
     }
