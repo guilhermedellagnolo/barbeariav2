@@ -4,7 +4,7 @@
 // para evitar estado stale entre hot-reloads do Next.js e re-uso de conexão cacheada.
 import { createClient } from '@/lib/supabase/client'
 
-export const BARBERSHOP_ID = '3088ce7e-4b1f-4b7e-a3fc-fc97bb1f5a43'
+export const BARBERSHOP_ID = process.env.NEXT_PUBLIC_BARBEARIA_ID || '3088ce7e-4b1f-4b7e-a3fc-fc97bb1f5a43'
 
 export interface WorkingHours {
   id: string

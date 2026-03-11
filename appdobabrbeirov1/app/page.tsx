@@ -161,8 +161,6 @@ export default function BarberApp() {
   const [services, setServices] = useState<Service[]>([])
   const [completedCuts, setCompletedCuts] = useState<CompletedCut[]>([])
   
-  const BARBER_ID = '3088ce7e-4b1f-4b7e-a3fc-fc97bb1f5a43'
-
   useEffect(() => {
     fetchServices()
     fetchClients()

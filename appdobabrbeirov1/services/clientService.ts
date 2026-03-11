@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase"
 import { Client } from "@/types"
 
-const BARBER_ID = '3088ce7e-4b1f-4b7e-a3fc-fc97bb1f5a43'
+const BARBER_ID = process.env.NEXT_PUBLIC_BARBEARIA_ID || '3088ce7e-4b1f-4b7e-a3fc-fc97bb1f5a43'
 
 export const fetchClients = async (): Promise<Client[]> => {
     try {

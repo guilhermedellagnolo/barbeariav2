@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(powershell -Command \"Set-Content -Path ''C:\\\\Users\\\\Admin\\\\AppData\\\\Local\\\\Temp\\\\sc.ps1'' -Value ''Write-Output ok'' -Encoding UTF8\")",
-      "Bash(powershell -File \"C:\\\\Users\\\\Admin\\\\AppData\\\\Local\\\\Temp\\\\sc.ps1\")"
-    ]
-  }
-}
