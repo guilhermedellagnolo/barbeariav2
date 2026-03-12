@@ -11,14 +11,15 @@ export function LoginButton() {
     setLoading(true)
     const supabase = createClient()
     
-    // Captura o domínio atual (ex: teste-final.73.barber.com)
+    // Captura o domínio atual (ex: teste-final.73.barber.com ou oioi.t3barber.com.br)
     // Se estiver em localhost, usa o origin
     const currentOrigin = window.location.origin
     
+    // Força o redirecionamento para o subdomínio atual
+    // O Supabase só aceitará se estiver na lista de Redirect URLs
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // Redireciona para o callback no MESMO domínio onde o usuário está
         redirectTo: `${currentOrigin}/auth/callback`,
       },
     })
