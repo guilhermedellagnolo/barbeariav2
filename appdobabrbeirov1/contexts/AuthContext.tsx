@@ -36,18 +36,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Resolve barbeiro record from auth user ID
   const resolveBarbeiro = async (userId: string): Promise<BarbeiroInfo | null> => {
-    const { data, error: queryError } = await supabase
-      .from("barbeiros")
-      .select("id, barbearia_id, nome")
-      .eq("usuario_id", userId)
-      .eq("ativo", true)
-      .maybeSingle()
+    try {
+      // Add a small timeout for database query too, to avoid infinite loading on db issues
+      const dbPromise = supabase
+        .from("barbeiros")
+        .select("id, barbearia_id, nome")
+        .eq("usuario_id", userId)
+        .eq("ativo", true)
+        .maybeSingle()
 
-    if (queryError) {
-      console.error("[Auth] Erro ao resolver barbeiro:", queryError)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout DB")), 5000)
+      )
+
+      const result: any = await Promise.race([dbPromise, timeoutPromise])
+      const { data, error: queryError } = result
+
+      if (queryError) {
+        console.error("[Auth] Erro ao resolver barbeiro:", queryError)
+        return null
+      }
+      return data
+    } catch (err) {
+      console.error("[Auth] Erro ao buscar dados do barbeiro (Timeout/Network):", err)
       return null
     }
-    return data
   }
 
   // Initialize auth state on mount
@@ -57,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // Timeout de segurança para evitar loading infinito se o Supabase demorar
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Timeout de autenticação")), 5000)
+            setTimeout(() => reject(new Error("Timeout de autenticação")), 8000) // Increased to 8s
         )
 
         const sessionPromise = supabase.auth.getSession()
@@ -77,7 +90,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (err) {
-        console.error("[Auth] Erro na inicialização:", err)
+        console.warn("[Auth] Inicialização lenta ou falha de conexão (Timeout). Continuando sem sessão.", err)
+        // Não faz nada, o loading será setado para false no finally.
+        // Se o onAuthStateChange disparar depois, ele atualiza o estado.
       } finally {
         if (mounted) setLoading(false)
       }
@@ -89,30 +104,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
+      // Se o evento for apenas refresh de token e já temos o usuário, não faz nada visualmente
+      // Isso evita recarregamentos desnecessários ao trocar de aba
+      if (event === "TOKEN_REFRESHED" && user && session?.user?.id === user.id) {
+          return
+      }
+
       if (event === "SIGNED_IN" && session?.user) {
         setUser(session.user)
-        // Ensure loading is true while resolving barber
-        setLoading(true) 
-        const barberData = await resolveBarbeiro(session.user.id)
+        
+        // Só exibe loading se realmente não tivermos dados do barbeiro ainda
+        // Se for um re-login rápido ou refresh, tentamos fazer em background se possível
+        if (!barbeiro) {
+            setLoading(true) 
+            const barberData = await resolveBarbeiro(session.user.id)
 
-        if (barberData && mounted) {
-          setBarbeiro(barberData)
-          setSessionIds(barberData.barbearia_id, barberData.id, barberData.nome)
-          setError(null)
-        } else if (mounted) {
-          setError("Sua conta existe mas nenhum barbeiro foi vinculado a ela. Contate o administrador.")
+            if (barberData && mounted) {
+                setBarbeiro(barberData)
+                setSessionIds(barberData.barbearia_id, barberData.id, barberData.nome)
+                setError(null)
+            } else if (mounted) {
+                setError("Sua conta existe mas nenhum barbeiro foi vinculado a ela. Contate o administrador.")
+            }
         }
       } else if (event === "SIGNED_OUT") {
         setUser(null)
         setBarbeiro(null)
         clearSession()
         setError(null)
-      } else if (event === "TOKEN_REFRESHED") {
-        // Just ensure user is set
-        if (session?.user) setUser(session.user)
-      }
+      } 
       
-      // Ensure loading is set to false after any auth event
+      // Ensure loading is set to false after any auth event processing
       if (mounted) setLoading(false)
     })
 
@@ -120,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         mounted = false
         subscription.unsubscribe()
     }
-  }, [])
+  }, [user, barbeiro]) // Adicionado dependências para evitar stale closures, embora 'user' seja atualizado via setUser
 
   const signIn = async (email: string, password: string): Promise<{ error: string | null }> => {
     setError(null)
