@@ -89,10 +89,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setError("Sua conta existe mas nenhum barbeiro foi vinculado a ela. Contate o administrador.")
           }
         }
-      } catch (err) {
-        console.warn("[Auth] Inicialização lenta ou falha de conexão (Timeout). Continuando sem sessão.", err)
-        // Não faz nada, o loading será setado para false no finally.
-        // Se o onAuthStateChange disparar depois, ele atualiza o estado.
+      } catch (err: any) {
+        console.warn("[Auth] Inicialização lenta ou falha de conexão (Timeout).", err)
+        if (mounted) {
+            setError(`Erro de conexão: ${err.message || "Tempo limite excedido"}. Tente recarregar.`)
+        }
       } finally {
         if (mounted) setLoading(false)
       }
@@ -142,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         mounted = false
         subscription.unsubscribe()
     }
-  }, [user, barbeiro]) // Adicionado dependências para evitar stale closures, embora 'user' seja atualizado via setUser
+  }, [user, barbeiro]) // Adicionado dependências para evitar stale closures
 
   const signIn = async (email: string, password: string): Promise<{ error: string | null }> => {
     setError(null)
