@@ -300,8 +300,13 @@ export default function BarberApp() {
       }
 
       // 3. Generate Slots using the Engine
+      // CRITICAL FIX: Use local date construction to prevent UTC timezone shifts
+      const dateStr = targetDate.getFullYear() + '-' + 
+          String(targetDate.getMonth() + 1).padStart(2, '0') + '-' + 
+          String(targetDate.getDate()).padStart(2, '0');
+
       const slots = appointmentService.generateAvailableSlots(
-          targetDate.toISOString().split('T')[0], // YYYY-MM-DD
+          dateStr, // YYYY-MM-DD (Local)
           workingHours,
           data || [],
           30, // grade padronizada em 30 min (MVP)
@@ -908,7 +913,7 @@ export default function BarberApp() {
           <main className="p-4">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Agenda do Dia ({dateKey})
+                Agenda do Dia ({renderDateKey})
               </h2>
               <span className="text-xs text-muted-foreground">
                 {currentSlots.filter((s) => s.status === "ocupado").length} agendamentos
