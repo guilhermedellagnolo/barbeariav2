@@ -15,27 +15,37 @@ export const generateAvailableSlots = (
     }
 
     const slots: TimeSlot[] = []
-    const [startHour, startMinute] = workingHours.startTime.split(':').map(Number)
-    const [endHour, endMinute] = workingHours.endTime.split(':').map(Number)
-    const [lunchStartHour, lunchStartMinute] = (workingHours.lunchStart || "12:00").split(':').map(Number)
-    const [lunchEndHour, lunchEndMinute] = (workingHours.lunchEnd || "13:00").split(':').map(Number)
+    
+    // Tratamento robusto para horários indefinidos
+    const startH = workingHours.startTime || "09:00"
+    const endH = workingHours.endTime || "19:00"
+    const lunchStartH = workingHours.lunchStart || "12:00"
+    const lunchEndH = workingHours.lunchEnd || "13:00"
+
+    const [startHour, startMinute] = startH.split(':').map(Number)
+    const [endHour, endMinute] = endH.split(':').map(Number)
+    const [lunchStartHour, lunchStartMinute] = lunchStartH.split(':').map(Number)
+    const [lunchEndHour, lunchEndMinute] = lunchEndH.split(':').map(Number)
 
     // Configura data base para cálculo
-    const current = new Date(`${date}T00:00:00`)
+    // Usar a data fornecida mas forçar fuso horário local ou UTC conforme necessidade
+    // A melhor prática para datas "YYYY-MM-DD" é tratar como meia-noite local
+    const [year, month, day] = date.split('-').map(Number)
+    
+    const current = new Date(year, month - 1, day)
     current.setHours(startHour, startMinute, 0, 0)
 
-    const end = new Date(`${date}T00:00:00`)
+    const end = new Date(year, month - 1, day)
     end.setHours(endHour, endMinute, 0, 0)
 
-    const lunchStart = new Date(`${date}T00:00:00`)
+    const lunchStart = new Date(year, month - 1, day)
     lunchStart.setHours(lunchStartHour, lunchStartMinute, 0, 0)
 
-    const lunchEnd = new Date(`${date}T00:00:00`)
+    const lunchEnd = new Date(year, month - 1, day)
     lunchEnd.setHours(lunchEndHour, lunchEndMinute, 0, 0)
 
-    // Hora atual para a trava de 2 horas (Considerando UTC-3 se necessário, ou local do browser)
+    // Hora atual para a trava de 2 horas
     const now = new Date()
-    // Margem de segurança de 2 horas em milissegundos
     const bookingThreshold = now.getTime() + (2 * 60 * 60 * 1000)
 
     while (current < end) {
@@ -54,10 +64,22 @@ export const generateAvailableSlots = (
         // 3. Regra de Bloqueio Manual (persistido no banco com status = 'bloqueado')
         const blockedRecord = existingAppointments.find(apt => {
             if (apt.status !== 'bloqueado') return false
-            const apptStart = new Date(apt.data_hora).getTime()
-            const slotStart = current.getTime()
-            // Bloqueio é pontual (1 slot = 30 min), comparação exata
-            return slotStart === apptStart
+            // Comparação robusta de datas
+            const apptDate = new Date(apt.data_hora)
+            // Se as datas forem no mesmo dia, comparar horas e minutos
+            // Isso evita problemas com milissegundos ou segundos de diferença
+            const sameDay = apptDate.getDate() === current.getDate() && 
+                           apptDate.getMonth() === current.getMonth() &&
+                           apptDate.getFullYear() === current.getFullYear()
+            
+            if (!sameDay) return false
+
+            const apptH = apptDate.getHours()
+            const apptM = apptDate.getMinutes()
+            const currH = current.getHours()
+            const currM = current.getMinutes()
+
+            return apptH === currH && apptM === currM
         })
 
         if (blockedRecord && status !== "bloqueado") {
@@ -66,19 +88,28 @@ export const generateAvailableSlots = (
 
         // 4. Regra de Ocupação com overlap (Teorema da Interseção de Conjuntos)
         const isOccupied = existingAppointments.some(apt => {
-            if (apt.status === 'cancelado' || apt.status === 'faltou' || apt.status === 'bloqueado') return false
-            const apptStart = new Date(apt.data_hora).getTime()
+            if (apt.status === 'cancelado' || apt.status === 'faltou') return false
+            // O 'bloqueado' deve ser tratado como ocupado, mas sem exibir dados de cliente
+            
+            const apptDate = new Date(apt.data_hora)
+            // Ajuste crucial: Garantir que comparamos timestamps compatíveis
+            const apptStart = apptDate.getTime()
+            
             const apptDuration = apt.servicos?.duracao ?? apt.servicos?.duracao_minutos ?? 30
             const apptEnd = apptStart + (apptDuration * 60000)
             const slotStart = current.getTime()
             const slotEnd = slotStart + (30 * 60000)
+            
+            // Debug para entender por que some
+            // console.log(`Slot: ${timeString}, Appt: ${apptDate.toLocaleTimeString()}, Status: ${apt.status}`)
+
             return (slotStart < apptEnd && slotEnd > apptStart)
         })
 
         // Busca o agendamento exato para preencher nome/telefone/serviço na UI
         const appointment = isOccupied
             ? existingAppointments.find(apt => {
-                if (apt.status === 'cancelado' || apt.status === 'faltou' || apt.status === 'bloqueado') return false
+                if (apt.status === 'cancelado' || apt.status === 'faltou') return false
                 const apptStart = new Date(apt.data_hora).getTime()
                 const apptDuration = apt.servicos?.duracao ?? apt.servicos?.duracao_minutos ?? 30
                 const apptEnd = apptStart + (apptDuration * 60000)
@@ -339,16 +370,20 @@ export const blockSlot = async (
     barberId: string
 ): Promise<string> => {
     const [hours, minutes] = time.split(':')
-    const slotDate = new Date(date)
-    slotDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
-    const isoDate = slotDate.toISOString()
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const h = String(hours).padStart(2, '0')
+    const m = String(minutes).padStart(2, '0')
+    const s = '00'
+    const formattedDate = `${year}-${month}-${day}T${h}:${m}:${s}`
 
     const { data, error } = await supabase
         .from('agendamentos')
         .insert([{
             barbearia_id: getBarbeariaId(),
             barbeiro_id: barberId,
-            data_hora: isoDate,
+            data_hora: formattedDate,
             status: 'bloqueado',
             cliente_nome: null,
             cliente_telefone: null,
@@ -387,14 +422,21 @@ export const blockMultipleSlots = async (
 ): Promise<{ time: string; id: string }[]> => {
     if (times.length === 0) return []
 
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+
     const records = times.map(time => {
         const [hours, minutes] = time.split(':')
-        const slotDate = new Date(date)
-        slotDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+        const h = String(hours).padStart(2, '0')
+        const m = String(minutes).padStart(2, '0')
+        const s = '00'
+        const formattedDate = `${year}-${month}-${day}T${h}:${m}:${s}`
+        
         return {
             barbearia_id: getBarbeariaId(),
             barbeiro_id: barberId,
-            data_hora: slotDate.toISOString(),
+            data_hora: formattedDate,
             status: 'bloqueado' as const,
             cliente_nome: null,
             cliente_telefone: null,
