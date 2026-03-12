@@ -11,10 +11,10 @@ const FALLBACK_BARBEARIA_ID = process.env.NEXT_PUBLIC_BARBEARIA_ID || 'fc398d1d-
 const ROOT_DOMAIN = process.env.ROOT_DOMAIN || ''
 
 // ─── Resolve barbearia_id via subdomínio OU domínio customizado ──────────────
-async function resolveBarbeariaId(hostname: string): Promise<string | null> {
+async function resolveBarbeariaId(hostname: string): Promise<{ id: string; ativo: boolean } | null> {
   // Dev: localhost / 127.0.0.1 → fallback para env var
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return FALLBACK_BARBEARIA_ID
+    return { id: FALLBACK_BARBEARIA_ID, ativo: true }
   }
 
   // Estratégia 1: Subdomínio (pereira.t3barber.com.br → subdominio = "pereira")
@@ -31,10 +31,10 @@ async function resolveBarbeariaId(hostname: string): Promise<string | null> {
   return lookupByColumn('dominio_customizado', hostname)
 }
 
-async function lookupByColumn(column: string, value: string): Promise<string | null> {
+async function lookupByColumn(column: string, value: string): Promise<{ id: string; ativo: boolean } | null> {
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/barbearias?${column}=eq.${encodeURIComponent(value)}&select=id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/barbearias?${column}=eq.${encodeURIComponent(value)}&select=id,ativo&limit=1`,
       {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
@@ -47,7 +47,9 @@ async function lookupByColumn(column: string, value: string): Promise<string | n
     if (!res.ok) return null
 
     const data = await res.json()
-    return data?.[0]?.id || null
+    if (!data?.[0]) return null
+    
+    return { id: data[0].id, ativo: data[0].ativo }
   } catch {
     return null
   }
@@ -58,15 +60,33 @@ export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') || ''
   const hostname = host.split(':')[0].replace(/^www\./, '')
 
-  const barbeariaId = await resolveBarbeariaId(hostname)
+  const barbearia = await resolveBarbeariaId(hostname)
+  const { pathname } = request.nextUrl
 
-  if (!barbeariaId) {
+  if (!barbearia) {
     return new NextResponse('Barbearia não encontrada.', { status: 404 })
+  }
+
+  // Se barbearia inativa -> redireciona para página de manutenção
+  // (Exceto se já estiver na página de manutenção para evitar loop)
+  const isMaintenancePage = pathname === '/manutencao'
+  
+  if (!barbearia.ativo && !isMaintenancePage) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/manutencao'
+    return NextResponse.redirect(url)
+  }
+
+  // Se ativa e tenta acessar manutenção -> manda pra home
+  if (barbearia.ativo && isMaintenancePage) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    return NextResponse.redirect(url)
   }
 
   // Injeta barbearia_id nos headers do request para leitura em Server Components
   const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('x-barbearia-id', barbeariaId)
+  requestHeaders.set('x-barbearia-id', barbearia.id)
 
   // ── STEP 2: Supabase Auth Session Refresh (logica original) ─────────────────
   let supabaseResponse = NextResponse.next({
@@ -100,8 +120,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { pathname } = request.nextUrl
-
   // Rotas publicas: acessiveis sem autenticacao
   const isPublicRoute =
     pathname === '/' ||
@@ -126,7 +144,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Propaga x-barbearia-id na response tambem
-  supabaseResponse.headers.set('x-barbearia-id', barbeariaId)
+  supabaseResponse.headers.set('x-barbearia-id', barbearia.id)
 
   return supabaseResponse
 }

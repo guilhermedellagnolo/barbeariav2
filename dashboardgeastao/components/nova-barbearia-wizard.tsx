@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { ImageUpload } from "@/components/image-upload"
-import { uploadFotoFundo, uploadFotoBarbeiro } from "@/services/uploadService"
+import { uploadFotoFundo, uploadFotoBarbeiro, uploadFotoGaleria } from "@/services/uploadService"
 import type { NovaBarbearia, Plano } from "@/lib/types"
 
 interface NovaBarbeariaWizardProps {
@@ -53,6 +53,7 @@ const initialData: NovaBarbearia = {
   horarios_texto: "",
   ano_fundacao: new Date().getFullYear(),
   foto_fundo_url: "",
+  fotos_galeria: [],
   barbeiros: [],
 }
 
@@ -380,6 +381,48 @@ export function NovaBarbeariaWizard({ onBack, onCreate, saving }: NovaBarbeariaW
                   hint="Recomendado: 1920x1080 (16:9)"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Galeria de Fotos (Opcional)</Label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {data.fotos_galeria.map((foto, index) => (
+                  <div key={index} className="relative aspect-square">
+                    <img
+                      src={foto}
+                      alt={`Galeria ${index + 1}`}
+                      className="w-full h-full object-cover rounded-lg border border-border"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 size-6"
+                      onClick={() => {
+                        const newGaleria = [...data.fotos_galeria]
+                        newGaleria.splice(index, 1)
+                        updateField("fotos_galeria", newGaleria)
+                      }}
+                    >
+                      <Trash2 className="size-3" />
+                    </Button>
+                  </div>
+                ))}
+                {data.fotos_galeria.length < 6 && (
+                  <ImageUpload
+                    value=""
+                    onChange={(url) => {
+                      if (url) updateField("fotos_galeria", [...data.fotos_galeria, url])
+                    }}
+                    onUpload={(file) => uploadFotoGaleria(file, data.subdominio || "temp", data.fotos_galeria.length)}
+                    aspectRatio="square"
+                    hint="Adicionar foto"
+                    className="h-full"
+                  />
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Adicione até 6 fotos para mostrar o ambiente e serviços ({data.fotos_galeria.length}/6)
+              </p>
             </div>
           </CardContent>
         </Card>

@@ -269,7 +269,20 @@ export const createAppointment = async (
     const [hours, minutes] = time.split(':')
     const appointmentDate = new Date(date)
     appointmentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
-    const isoDate = appointmentDate.toISOString()
+    
+    // Converte para ISO string preservando o fuso horário local do browser
+    // O backend/banco deve lidar com timestamptz ou simplesmente armazenar o ISO enviado
+    // Ajuste para garantir que o dia não mude devido a conversão UTC
+    const isoDate = appointmentDate.toString() // Use local string representation for debugging, or construct ISO manually
+    
+    // Melhor abordagem: Construir ISO string manualmente baseada na data local
+    const year = appointmentDate.getFullYear()
+    const month = String(appointmentDate.getMonth() + 1).padStart(2, '0')
+    const day = String(appointmentDate.getDate()).padStart(2, '0')
+    const h = String(appointmentDate.getHours()).padStart(2, '0')
+    const m = String(appointmentDate.getMinutes()).padStart(2, '0')
+    const s = '00'
+    const formattedDate = `${year}-${month}-${day}T${h}:${m}:${s}` // YYYY-MM-DDTHH:mm:ss (sem Z, assume local/postgres config)
 
     // 1. Check Availability (Race Condition Prevention)
     const { data: existing, error: checkError } = await supabase
@@ -277,9 +290,9 @@ export const createAppointment = async (
         .select('id')
         .eq('barbearia_id', getBarbeariaId())
         .eq('barbeiro_id', getBarbeiroId())
-        .eq('data_hora', isoDate)
+        .eq('data_hora', formattedDate)
         .not('status', 'in', '("cancelado","faltou")') // Ignore cancelled
-        .single()
+        .maybeSingle()
 
     if (existing) {
         throw new Error("Este horário já foi ocupado por outro cliente.")
@@ -293,7 +306,7 @@ export const createAppointment = async (
             barbeiro_id: getBarbeiroId(),
             cliente_id: clientId,
             servico_id: serviceId,
-            data_hora: isoDate,
+            data_hora: formattedDate,
             status: 'agendado',
             cliente_nome: clientName,
             cliente_telefone: clientPhone

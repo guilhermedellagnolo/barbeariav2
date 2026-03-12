@@ -10,5 +10,10 @@ export function getAdminClient() {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurada no servidor.")
   }
 
-  return createClient(url, key)
+  return createClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
 }

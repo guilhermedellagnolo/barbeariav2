@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     if (action === "create") {
       // 1. Criar contas auth para barbeiros
       const emailToUserId = new Map<string, string>()
+      const authErrors: string[] = []
       for (const barber of data.barbeiros || []) {
         if (!barber.email || !barber.senha) continue
         const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -23,9 +24,18 @@ export async function POST(request: NextRequest) {
         })
         if (authError) {
           console.error(`[Admin] Erro auth ${barber.email}:`, authError.message)
+          authErrors.push(`${barber.nome} (${barber.email}): ${authError.message}`)
         } else if (authData.user) {
           emailToUserId.set(barber.email, authData.user.id)
         }
+      }
+
+      // Se NENHUMA conta auth foi criada e havia barbeiros com credenciais, erro fatal
+      if (authErrors.length > 0 && emailToUserId.size === 0 && (data.barbeiros || []).some((b: any) => b.email && b.senha)) {
+        return NextResponse.json(
+          { error: `Falha ao criar contas dos barbeiros: ${authErrors.join("; ")}` },
+          { status: 400 }
+        )
       }
 
       // 2. Inserir barbearia
@@ -64,6 +74,13 @@ export async function POST(request: NextRequest) {
 
       // 3. Inserir barbeiros com usuario_id vinculado
       if (data.barbeiros?.length > 0) {
+        // Log para debug
+        console.log("Barbeiros para inserir:", JSON.stringify(data.barbeiros.map((b: any) => ({
+          nome: b.nome,
+          email: b.email,
+          foundUserId: emailToUserId.get(b.email)
+        })), null, 2))
+
         const { data: insertedBarbers, error: errB } = await supabase
           .from("barbeiros")
           .insert(
@@ -75,7 +92,7 @@ export async function POST(request: NextRequest) {
               usuario_id: emailToUserId.get(b.email) || null,
             }))
           )
-          .select("id")
+          .select("id, usuario_id")
 
         if (errB) {
           return NextResponse.json(
@@ -86,6 +103,12 @@ export async function POST(request: NextRequest) {
 
         // 3.1 Criar horarios_trabalho default (Seg-Sáb 9-19h, Dom folga)
         if (insertedBarbers?.length) {
+          // Verificar se algum barbeiro ficou sem usuario_id (erro silencioso)
+          const missingAuth = insertedBarbers.filter((b: any) => !b.usuario_id)
+          if (missingAuth.length > 0) {
+            console.warn("[Admin] ATENÇÃO: Barbeiros criados sem usuario_id:", missingAuth)
+          }
+
           const horariosDefault = insertedBarbers.flatMap((barber: any) =>
             [0, 1, 2, 3, 4, 5, 6].map((dia) => ({
               barbeiro_id: barber.id,
@@ -105,7 +128,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json({ id: row.id, success: true })
+      return NextResponse.json({
+        id: row.id,
+        success: true,
+        authWarnings: authErrors.length > 0 ? authErrors : undefined
+      })
     }
 
     // ── ACTION: update ─────────────────────────────────────────────────────
@@ -145,7 +172,28 @@ export async function POST(request: NextRequest) {
 
       // Sync barbeiros (diff-based)
       if (fields.barbeiros) {
-        await syncBarbeiros(supabase, id, fields.barbeiros)
+        // 1. Criar contas auth para novos barbeiros ou barbeiros que tiveram email alterado (se aplicável)
+        // Nota: Neste MVP, não estamos tratando alteração de email/senha no update, apenas criação de novos.
+        const emailToUserId = new Map<string, string>()
+        
+        for (const barber of fields.barbeiros) {
+          // Se for novo (id começa com "new-") e tem credenciais
+          if (barber.id.startsWith("new-") && barber.email && barber.senha) {
+             const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+              email: barber.email,
+              password: barber.senha,
+              email_confirm: true,
+              user_metadata: { nome: barber.nome, role: "barbeiro" },
+            })
+            if (authError) {
+              console.error(`[Admin] Erro auth update ${barber.email}:`, authError.message)
+            } else if (authData.user) {
+              emailToUserId.set(barber.email, authData.user.id)
+            }
+          }
+        }
+
+        await syncBarbeiros(supabase, id, fields.barbeiros, emailToUserId)
       }
 
       return NextResponse.json({ success: true })
@@ -153,10 +201,12 @@ export async function POST(request: NextRequest) {
 
     // ── ACTION: toggle ─────────────────────────────────────────────────────
     if (action === "toggle") {
+      const { id, ativo } = data
+      
       const { error } = await supabase
         .from("barbearias")
-        .update({ ativo: data.ativo })
-        .eq("id", data.id)
+        .update({ ativo })
+        .eq("id", id)
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
@@ -190,8 +240,20 @@ export async function GET() {
     // 2. Barbeiros (1 query)
     const { data: allBarbeiros } = await supabase
       .from("barbeiros")
-      .select("id, barbearia_id, nome, foto_url, ativo")
+      .select("id, barbearia_id, nome, foto_url, ativo, usuario_id")
       .in("barbearia_id", ids)
+
+    // 2.1 Buscar emails dos auth users vinculados
+    const userIds = (allBarbeiros || []).map((b: any) => b.usuario_id).filter(Boolean)
+    const emailByUserId: Record<string, string> = {}
+    if (userIds.length > 0) {
+      const { data: authUsers } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+      if (authUsers?.users) {
+        for (const u of authUsers.users) {
+          emailByUserId[u.id] = u.email || ""
+        }
+      }
+    }
 
     // 3. Contagem de agendamentos (1 query)
     const { data: agendCounts } = await supabase
@@ -239,6 +301,7 @@ export async function GET() {
         nome: b.nome,
         foto_url: b.foto_url || "",
         ativo: b.ativo ?? true,
+        email: b.usuario_id ? (emailByUserId[b.usuario_id] || "") : "",
       })),
       total_agendamentos: countByBarb[row.id] || 0,
     }))
@@ -250,7 +313,7 @@ export async function GET() {
 }
 
 // ─── Sync barbeiros (diff-based) ──────────────────────────────────────────────
-async function syncBarbeiros(supabase: any, barbeariaId: string, barbeiros: any[]) {
+async function syncBarbeiros(supabase: any, barbeariaId: string, barbeiros: any[], emailToUserId: Map<string, string> = new Map()) {
   const { data: existing } = await supabase
     .from("barbeiros")
     .select("id")
@@ -268,14 +331,32 @@ async function syncBarbeiros(supabase: any, barbeariaId: string, barbeiros: any[
   // Inserir novos
   const toInsert = barbeiros.filter((b: any) => b.id.startsWith("new-"))
   if (toInsert.length > 0) {
-    await supabase.from("barbeiros").insert(
+    const newBarbers = await supabase.from("barbeiros").insert(
       toInsert.map((b: any) => ({
         barbearia_id: barbeariaId,
         nome: b.nome,
         foto_url: b.foto_url || null,
         ativo: b.ativo,
+        usuario_id: emailToUserId.get(b.email) || null // Vincula usuario_id recém-criado
       }))
-    )
+    ).select("id")
+
+    // Criar horários padrão para os novos barbeiros
+    if (newBarbers.data?.length) {
+      const horariosDefault = newBarbers.data.flatMap((barber: any) =>
+        [0, 1, 2, 3, 4, 5, 6].map((dia: number) => ({
+          barbeiro_id: barber.id,
+          dia_semana: dia,
+          inicio: "09:00",
+          fim: "19:00",
+          inicio_almoco: "12:00",
+          fim_almoco: "13:00",
+          trabalha: dia >= 1 && dia <= 6,
+          duracao_slot: 30,
+        }))
+      )
+      await supabase.from("horarios_trabalho").insert(horariosDefault)
+    }
   }
 
   // Atualizar existentes
@@ -285,5 +366,23 @@ async function syncBarbeiros(supabase: any, barbeariaId: string, barbeiros: any[
       .from("barbeiros")
       .update({ nome: b.nome, foto_url: b.foto_url || null, ativo: b.ativo })
       .eq("id", b.id)
+
+    // Se veio nova senha, atualizar no auth
+    if (b.novaSenha && b.novaSenha.length >= 6) {
+      // Buscar o usuario_id deste barbeiro
+      const { data: barberRow } = await supabase
+        .from("barbeiros")
+        .select("usuario_id")
+        .eq("id", b.id)
+        .single()
+
+      if (barberRow?.usuario_id) {
+        const { error: pwErr } = await supabase.auth.admin.updateUserById(
+          barberRow.usuario_id,
+          { password: b.novaSenha }
+        )
+        if (pwErr) console.error(`[Admin] Erro ao atualizar senha de ${b.nome}:`, pwErr.message)
+      }
+    }
   }
 }

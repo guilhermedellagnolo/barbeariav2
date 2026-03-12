@@ -58,14 +58,16 @@ export default function Dashboard() {
   }
 
   const handleToggleAtivo = async (id: string, ativo: boolean) => {
+    // 1. Optimistic Update (Instant Feedback)
+    setBarbearias((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ativo } : b))
+    )
+
     try {
-      // Optimistic update
-      setBarbearias((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, ativo } : b))
-      )
+      // 2. Server Sync
       await toggleAtivo(id, ativo)
     } catch (err) {
-      // Revert on failure
+      // 3. Rollback on Failure
       setBarbearias((prev) =>
         prev.map((b) => (b.id === id ? { ...b, ativo: !ativo } : b))
       )

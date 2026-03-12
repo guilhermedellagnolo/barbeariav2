@@ -10,10 +10,16 @@ export function LoginButton() {
   async function handleGoogleLogin() {
     setLoading(true)
     const supabase = createClient()
+    
+    // Captura o domínio atual (ex: teste-final.73.barber.com)
+    // Se estiver em localhost, usa o origin
+    const currentOrigin = window.location.origin
+    
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        // Redireciona para o callback no MESMO domínio onde o usuário está
+        redirectTo: `${currentOrigin}/auth/callback`,
       },
     })
   }

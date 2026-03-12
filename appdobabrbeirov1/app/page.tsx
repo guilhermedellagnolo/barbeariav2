@@ -1248,8 +1248,22 @@ export default function BarberApp() {
     )
   }
 
-  if (!user || !barbeiro) {
-    return null // useEffect will redirect to /login
+  if (!barbeiro) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto mb-3" />
+          <p className="text-zinc-400 text-sm">
+            {authError ? "Erro ao carregar perfil." : "Carregando perfil..."}
+          </p>
+          {authError && (
+             <Button onClick={signOut} variant="link" className="text-amber-500 mt-2">
+               Tentar novamente
+             </Button>
+          )}
+        </div>
+      </div>
+    )
   }
 
   if (authError) {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, Save, Plus, Trash2, UserCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, Save, Plus, Trash2, UserCircle, Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -26,6 +26,8 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
+import { ImageUpload } from "@/components/image-upload"
+import { uploadFotoFundo, uploadFotoBarbeiro, uploadFotoGaleria } from "@/services/uploadService"
 import type { Barbearia, Barbeiro, Plano, StatusPagamento } from "@/lib/types"
 
 interface BarbeariaDetailsProps {
@@ -37,8 +39,10 @@ interface BarbeariaDetailsProps {
 
 export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, saving }: BarbeariaDetailsProps) {
   const [barbearia, setBarbearia] = useState<Barbearia>(initialBarbearia)
-  const [newBarbeiro, setNewBarbeiro] = useState({ nome: "", foto_url: "" })
+  const [newBarbeiro, setNewBarbeiro] = useState({ nome: "", foto_url: "", email: "", senha: "" })
   const [galeriaInput, setGaleriaInput] = useState("")
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({})
+  const [showNewPassword, setShowNewPassword] = useState(false)
 
   const updateField = <K extends keyof Barbearia>(field: K, value: Barbearia[K]) => {
     setBarbearia((prev) => ({ ...prev, [field]: value }))
@@ -49,18 +53,21 @@ export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, 
   }
 
   const addBarbeiro = () => {
-    if (newBarbeiro.nome) {
+    if (newBarbeiro.nome && newBarbeiro.email && newBarbeiro.senha.length >= 6) {
       const barbeiro: Barbeiro = {
         id: `new-${Date.now()}`,
         nome: newBarbeiro.nome,
         foto_url: newBarbeiro.foto_url || "",
         ativo: true,
+        email: newBarbeiro.email,
+        novaSenha: newBarbeiro.senha,
       }
       setBarbearia((prev) => ({
         ...prev,
         barbeiros: [...prev.barbeiros, barbeiro],
       }))
-      setNewBarbeiro({ nome: "", foto_url: "" })
+      setNewBarbeiro({ nome: "", foto_url: "", email: "", senha: "" })
+      setShowNewPassword(false)
     }
   }
 
@@ -259,47 +266,57 @@ export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, 
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="foto_fundo">URL da Foto de Fundo</Label>
-                <Input
-                  id="foto_fundo"
+                <ImageUpload
+                  label="Foto de Fundo"
                   value={barbearia.foto_fundo_url}
-                  onChange={(e) => updateField("foto_fundo_url", e.target.value)}
-                  placeholder="https://..."
-                  className="bg-background border-input"
+                  onChange={(url) => updateField("foto_fundo_url", url)}
+                  onUpload={(file) => uploadFotoFundo(file, barbearia.subdominio || "temp")}
+                  aspectRatio="video"
+                  hint="Recomendado: 1920x1080 (16:9)"
                 />
               </div>
+
               <div className="space-y-2">
                 <Label>Galeria de Fotos</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={galeriaInput}
-                    onChange={(e) => setGaleriaInput(e.target.value)}
-                    placeholder="URL da imagem..."
-                    className="bg-background border-input"
-                  />
-                  <Button onClick={addGaleriaUrl} variant="secondary">
-                    <Plus className="size-4" />
-                  </Button>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {barbearia.fotos_galeria.map((foto, index) => (
+                    <div key={index} className="relative aspect-square">
+                      <img
+                        src={foto}
+                        alt={`Galeria ${index + 1}`}
+                        className="w-full h-full object-cover rounded-lg border border-border"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 size-6"
+                        onClick={() => removeGaleriaUrl(index)}
+                      >
+                        <Trash2 className="size-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  {barbearia.fotos_galeria.length < 6 && (
+                    <ImageUpload
+                      value=""
+                      onChange={(url) => {
+                        if (url) {
+                          setBarbearia((prev) => ({
+                            ...prev,
+                            fotos_galeria: [...prev.fotos_galeria, url],
+                          }))
+                        }
+                      }}
+                      onUpload={(file) => uploadFotoGaleria(file, barbearia.subdominio || "temp", barbearia.fotos_galeria.length)}
+                      aspectRatio="square"
+                      hint="Adicionar foto"
+                      className="h-full"
+                    />
+                  )}
                 </div>
-                {barbearia.fotos_galeria.length > 0 && (
-                  <div className="grid gap-2 mt-2">
-                    {barbearia.fotos_galeria.map((url, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 rounded bg-muted">
-                        <span className="flex-1 text-sm text-muted-foreground truncate">
-                          {url}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          onClick={() => removeGaleriaUrl(index)}
-                        >
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  Adicione até 6 fotos para mostrar o ambiente e serviços ({barbearia.fotos_galeria.length}/6)
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -332,7 +349,7 @@ export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, 
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="new-barbeiro-nome">Nome</Label>
+                      <Label htmlFor="new-barbeiro-nome">Nome *</Label>
                       <Input
                         id="new-barbeiro-nome"
                         value={newBarbeiro.nome}
@@ -344,15 +361,61 @@ export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, 
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="new-barbeiro-foto">URL da Foto</Label>
+                      <Label htmlFor="new-barbeiro-email">
+                        <span className="flex items-center gap-1.5">
+                          <Mail className="size-3.5" />
+                          Email de acesso *
+                        </span>
+                      </Label>
                       <Input
-                        id="new-barbeiro-foto"
-                        value={newBarbeiro.foto_url}
+                        id="new-barbeiro-email"
+                        type="email"
+                        value={newBarbeiro.email}
                         onChange={(e) =>
-                          setNewBarbeiro((prev) => ({ ...prev, foto_url: e.target.value }))
+                          setNewBarbeiro((prev) => ({ ...prev, email: e.target.value }))
                         }
-                        placeholder="https://..."
+                        placeholder="barbeiro@email.com"
                         className="bg-background border-input"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-barbeiro-senha">
+                        <span className="flex items-center gap-1.5">
+                          <Lock className="size-3.5" />
+                          Senha de acesso *
+                        </span>
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="new-barbeiro-senha"
+                          type={showNewPassword ? "text" : "password"}
+                          value={newBarbeiro.senha}
+                          onChange={(e) =>
+                            setNewBarbeiro((prev) => ({ ...prev, senha: e.target.value }))
+                          }
+                          placeholder="Mínimo 6 caracteres"
+                          className="bg-background border-input pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                      </div>
+                      {newBarbeiro.senha && newBarbeiro.senha.length < 6 && (
+                        <p className="text-xs text-destructive">Mínimo 6 caracteres</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <ImageUpload
+                        label="Foto do Barbeiro"
+                        value={newBarbeiro.foto_url}
+                        onChange={(url) => setNewBarbeiro((prev) => ({ ...prev, foto_url: url }))}
+                        onUpload={(file) => uploadFotoBarbeiro(file, barbearia.subdominio || "temp", newBarbeiro.nome || "barbeiro")}
+                        aspectRatio="square"
+                        hint="Recomendado: 400x400"
                       />
                     </div>
                   </div>
@@ -361,7 +424,12 @@ export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, 
                       <Button variant="outline">Cancelar</Button>
                     </DialogClose>
                     <DialogClose asChild>
-                      <Button onClick={addBarbeiro}>Adicionar</Button>
+                      <Button
+                        onClick={addBarbeiro}
+                        disabled={!newBarbeiro.nome || !newBarbeiro.email || newBarbeiro.senha.length < 6}
+                      >
+                        Adicionar
+                      </Button>
                     </DialogClose>
                   </DialogFooter>
                 </DialogContent>
@@ -385,17 +453,34 @@ export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, 
                             onChange={(e) =>
                               updateBarbeiro(barbeiro.id, "nome", e.target.value)
                             }
+                            placeholder="Nome"
                             className="bg-background border-input h-8"
                           />
-                          <Input
-                            value={barbeiro.foto_url}
-                            onChange={(e) =>
-                              updateBarbeiro(barbeiro.id, "foto_url", e.target.value)
-                            }
-                            placeholder="URL da foto"
-                            className="bg-background border-input h-8 text-xs"
-                          />
-                          <div className="flex items-center justify-between pt-2">
+                          {barbeiro.email && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
+                              <Mail className="size-3" />
+                              <span>{barbeiro.email}</span>
+                            </div>
+                          )}
+                          <div className="relative">
+                            <Input
+                              type={showPasswords[barbeiro.id] ? "text" : "password"}
+                              value={barbeiro.novaSenha || ""}
+                              onChange={(e) =>
+                                updateBarbeiro(barbeiro.id, "novaSenha", e.target.value)
+                              }
+                              placeholder="Nova senha (deixe vazio para manter)"
+                              className="bg-background border-input h-8 text-xs pr-8"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPasswords(prev => ({ ...prev, [barbeiro.id]: !prev[barbeiro.id] }))}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                              {showPasswords[barbeiro.id] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between pt-1">
                             <div className="flex items-center gap-2">
                               <Switch
                                 checked={barbeiro.ativo}

@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string): Promise<{ error: string | null }> => {
     setError(null)
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     })
@@ -113,6 +113,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? "Email ou senha incorretos."
         : authError.message
       return { error: message }
+    }
+
+    if (data.user) {
+      const barberData = await resolveBarbeiro(data.user.id)
+
+      if (!barberData) {
+        await supabase.auth.signOut()
+        return { error: "Sua conta existe mas nenhum barbeiro foi vinculado a ela. Contate o administrador." }
+      }
     }
 
     return { error: null }

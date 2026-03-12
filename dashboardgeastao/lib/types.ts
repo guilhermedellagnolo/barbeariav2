@@ -7,6 +7,8 @@ export interface Barbeiro {
   nome: string
   foto_url: string
   ativo: boolean
+  email?: string
+  novaSenha?: string
 }
 
 export interface Barbearia {
@@ -58,5 +60,6 @@ export interface NovaBarbearia {
   horarios_texto: string
   ano_fundacao: number
   foto_fundo_url: string
+  fotos_galeria: string[]
   barbeiros: NovoBarbeiro[]
 }

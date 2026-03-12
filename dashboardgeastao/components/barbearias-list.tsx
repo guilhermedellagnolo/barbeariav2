@@ -185,13 +185,14 @@ export function BarbeariasList({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Switch
-                        checked={barbearia.ativo}
-                        onCheckedChange={(checked) => {
-                          onToggleAtivo(barbearia.id, checked)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                          checked={barbearia.ativo}
+                          onCheckedChange={(checked) => {
+                            onToggleAtivo(barbearia.id, checked)
+                          }}
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(barbearia.data_vencimento)}
