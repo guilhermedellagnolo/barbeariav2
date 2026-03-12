@@ -94,7 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setBarbeiro(null)
         clearSession()
         setError(null)
+      } else if (event === "TOKEN_REFRESHED") {
+        // Just ensure user is set
+        if (session?.user) setUser(session.user)
       }
+      
+      // Ensure loading is set to false after any auth event
+      setLoading(false)
     })
 
     return () => subscription.unsubscribe()

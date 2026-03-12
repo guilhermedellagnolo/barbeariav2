@@ -271,7 +271,12 @@ export default function BarberApp() {
     try {
       const targetDate = getTargetDate()
       
-      const data = await appointmentService.fetchAppointments(targetDate)
+      // CRITICAL FIX: Use local date construction to prevent UTC timezone shifts
+      const dateStr = targetDate.getFullYear() + '-' + 
+          String(targetDate.getMonth() + 1).padStart(2, '0') + '-' + 
+          String(targetDate.getDate()).padStart(2, '0');
+
+      const data = await appointmentService.fetchAppointments(dateStr)
       
       // Phase 4: Dynamic Slots Engine
       // 1. Get Barber ID from authenticated session
@@ -300,11 +305,6 @@ export default function BarberApp() {
       }
 
       // 3. Generate Slots using the Engine
-      // CRITICAL FIX: Use local date construction to prevent UTC timezone shifts
-      const dateStr = targetDate.getFullYear() + '-' + 
-          String(targetDate.getMonth() + 1).padStart(2, '0') + '-' + 
-          String(targetDate.getDate()).padStart(2, '0');
-
       const slots = appointmentService.generateAvailableSlots(
           dateStr, // YYYY-MM-DD (Local)
           workingHours,
