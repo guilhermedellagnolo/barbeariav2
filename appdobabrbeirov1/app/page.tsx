@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/AuthContext"
+import { getBarbeiroId } from "@/lib/session-store"
 import {
   Radar,
   Calendar,
@@ -23,6 +26,8 @@ import {
   ChevronRight,
   List,
   Edit2,
+  LogOut,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -144,8 +149,18 @@ const generateSlots = (openTime: string, closeTime: string, intervalMinutes: num
 }
 
 export default function BarberApp() {
+  const router = useRouter()
+  const { user, barbeiro, loading: authLoading, signOut, error: authError } = useAuth()
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login")
+    }
+  }, [authLoading, user, router])
+
   const [activeTab, setActiveTab] = useState<TabType>("radar")
-  
+
   // Settings State
   const [settings, setSettings] = useState<BarberSettings>({
     openTime: "08:00",
@@ -162,10 +177,11 @@ export default function BarberApp() {
   const [completedCuts, setCompletedCuts] = useState<CompletedCut[]>([])
   
   useEffect(() => {
+    if (!barbeiro) return
     fetchServices()
     fetchClients()
     fetchFinanceHistory()
-  }, [])
+  }, [barbeiro])
 
   const fetchFinanceHistory = async () => {
     try {
@@ -231,19 +247,19 @@ export default function BarberApp() {
   
   // Ensure slots exist for the selected date
   useEffect(() => {
+    if (!barbeiro) return
     fetchAppointments()
-  }, [dateKey])
+  }, [dateKey, barbeiro])
 
   const fetchAppointments = async () => {
     try {
       const data = await appointmentService.fetchAppointments(selectedDate)
       
       // Phase 4: Dynamic Slots Engine
-      // 1. Get Main Barber ID (In future, this will be dynamic)
-      const barberId = await appointmentService.fetchMainBarberId()
-      
+      // 1. Get Barber ID from authenticated session
+      const barberId = getBarbeiroId()
+
       if (!barberId) {
-          // Fallback state if no barber is configured
           setSlotsByDate(prev => ({ ...prev, [dateKey]: [] }))
           return
       }
@@ -445,9 +461,7 @@ export default function BarberApp() {
         setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
 
         // 2. Persistir no Supabase
-        const barberId = await appointmentService.fetchMainBarberId()
-        if (!barberId) throw new Error("Barbeiro não encontrado.")
-
+        const barberId = getBarbeiroId()
         const newId = await appointmentService.blockSlot(selectedDate, currentSlots[slotIndex].time, barberId)
 
         // 3. Atualiza o ID do slot para permitir desbloqueio posterior
@@ -506,9 +520,7 @@ export default function BarberApp() {
         setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
 
         // 3. Persistir no Supabase (batch insert)
-        const barberId = await appointmentService.fetchMainBarberId()
-        if (!barberId) throw new Error("Barbeiro não encontrado.")
-
+        const barberId = getBarbeiroId()
         const results = await appointmentService.blockMultipleSlots(selectedDate, slotsToBlock, barberId)
 
         // 4. Atualiza IDs retornados no estado local
@@ -716,11 +728,7 @@ export default function BarberApp() {
   const handleSaveSettings = async () => {
     setIsLoading(true)
     try {
-        const barberId = await appointmentService.fetchMainBarberId()
-        if (!barberId) {
-            alert("Erro: Barbeiro não encontrado.")
-            return
-        }
+        const barberId = getBarbeiroId()
 
         // Apply settings to Monday (1) through Saturday (6)
         const days = [1, 2, 3, 4, 5, 6]
@@ -1228,6 +1236,38 @@ export default function BarberApp() {
     }
   }
 
+  // ─── Auth Guards ─────────────────────────────────────────────────────────
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto mb-3" />
+          <p className="text-zinc-400 text-sm">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user || !barbeiro) {
+    return null // useEffect will redirect to /login
+  }
+
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <p className="text-red-400 text-sm mb-4">{authError}</p>
+          <button
+            onClick={signOut}
+            className="px-4 py-2 rounded-lg bg-zinc-800 text-white text-sm hover:bg-zinc-700 transition-colors"
+          >
+            Voltar ao Login
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-secondary/50 pb-20">
       {/* Header */}
@@ -1238,18 +1278,27 @@ export default function BarberApp() {
               <Scissors className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-foreground">Claudinei</h1>
+              <h1 className="text-lg font-bold text-foreground">{barbeiro.nome}</h1>
               <p className="text-xs text-muted-foreground capitalize">{todayStr}</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Previsto hoje</p>
-            <p className="text-lg font-bold text-emerald-600">
-              R$ {totalPrevisto.toFixed(2).replace(".", ",")}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Concluído: R$ {totalConcluido.toFixed(2).replace(".", ",")}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Previsto hoje</p>
+              <p className="text-lg font-bold text-emerald-600">
+                R$ {totalPrevisto.toFixed(2).replace(".", ",")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Concluído: R$ {totalConcluido.toFixed(2).replace(".", ",")}
+              </p>
+            </div>
+            <button
+              onClick={signOut}
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              title="Sair"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </header>

@@ -1,14 +1,13 @@
 import { supabase } from "@/lib/supabase"
 import { Service } from "@/types"
-
-const BARBER_ID = process.env.NEXT_PUBLIC_BARBEARIA_ID || '3088ce7e-4b1f-4b7e-a3fc-fc97bb1f5a43'
+import { getBarbeariaId } from "@/lib/session-store"
 
 export const fetchServices = async (): Promise<Service[]> => {
     try {
         const { data, error } = await supabase
             .from('servicos')
             .select('*')
-            .eq('barbearia_id', BARBER_ID)
+            .eq('barbearia_id', getBarbeariaId())
             .eq('is_active', true)
         
         if (error) throw error
@@ -32,7 +31,7 @@ export const fetchServices = async (): Promise<Service[]> => {
 export const createService = async (payload: Omit<Service, 'id'>) => {
     try {
         const dbPayload = {
-            barbearia_id: BARBER_ID,
+            barbearia_id: getBarbeariaId(),
             nome: payload.name,
             preco: payload.price,
             duracao: payload.duration,

@@ -1,14 +1,13 @@
 import { supabase } from "@/lib/supabase"
 import { Client } from "@/types"
-
-const BARBER_ID = process.env.NEXT_PUBLIC_BARBEARIA_ID || '3088ce7e-4b1f-4b7e-a3fc-fc97bb1f5a43'
+import { getBarbeariaId } from "@/lib/session-store"
 
 export const fetchClients = async (): Promise<Client[]> => {
     try {
         const { data, error } = await supabase
             .from('clientes')
             .select('*')
-            .eq('barbearia_id', BARBER_ID)
+            .eq('barbearia_id', getBarbeariaId())
         
         if (error) throw error
         
@@ -34,7 +33,7 @@ export const upsertClient = async (name: string, phone: string): Promise<Client 
         const { data: newClient, error: clientError } = await supabase
             .from('clientes')
             .insert([{
-                barbearia_id: BARBER_ID,
+                barbearia_id: getBarbeariaId(),
                 nome: name,
                 telefone: phone,
                 total_cortes: 0,

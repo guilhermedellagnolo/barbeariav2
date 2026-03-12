@@ -4,7 +4,9 @@
 // para evitar estado stale entre hot-reloads do Next.js e re-uso de conexão cacheada.
 import { createClient } from '@/lib/supabase/client'
 
-export const BARBERSHOP_ID = process.env.NEXT_PUBLIC_BARBEARIA_ID || '3088ce7e-4b1f-4b7e-a3fc-fc97bb1f5a43'
+/** @deprecated Use barbeariaId passado via prop (resolvido pelo middleware). Mantido apenas como fallback interno. */
+export const BARBERSHOP_ID = process.env.NEXT_PUBLIC_BARBEARIA_ID || 'fc398d1d-9c4e-4a93-9d45-8ebbaa1cf39a'
+const DEFAULT_BARBERSHOP_ID = BARBERSHOP_ID
 
 export interface WorkingHours {
   id: string
@@ -24,7 +26,7 @@ export interface Appointment {
   status: 'agendado' | 'concluido' | 'cancelado' | 'faltou'
   cliente_nome?: string
   cliente_telefone?: string
-  servicos?: { nome: string }
+  servicos?: { nome: string; duracao?: number; duracao_minutos?: number; preco?: number }
 }
 
 export interface TimeSlot {
@@ -41,6 +43,24 @@ export interface Barber {
   foto_url?: string
 }
 
+// ─── Interface para Barbearia (Multi-Tenant dinâmico) ────────────────────────
+export interface Barbearia {
+  id: string
+  nome: string
+  subdominio: string
+  dominio_customizado: string | null
+  ativo: boolean
+  foto_fundo_url: string | null
+  ano_fundacao: string | null
+  slogan_principal: string | null
+  descricao_hero: string | null
+  fotos_galeria: string[]
+  descricao_rodape: string | null
+  endereco: string | null
+  telefone: string | null
+  horarios_texto: string | null
+}
+
 // ─── Interface para Serviços ──────────────────────────────────────────────────
 export interface Servico {
   id: string
@@ -50,6 +70,25 @@ export interface Servico {
 }
 
 // ─── Funções de leitura ───────────────────────────────────────────────────────
+
+export async function getBarbearia(barbeariaId: string = BARBERSHOP_ID): Promise<Barbearia | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('barbearias')
+    .select('id, nome, subdominio, dominio_customizado, ativo, foto_fundo_url, ano_fundacao, slogan_principal, descricao_hero, fotos_galeria, descricao_rodape, endereco, telefone, horarios_texto')
+    .eq('id', barbeariaId)
+    .single()
+
+  if (error) {
+    console.error('[getBarbearia] Erro:', error.message, '| code:', error.code)
+    return null
+  }
+
+  return {
+    ...data,
+    fotos_galeria: data.fotos_galeria || [],
+  }
+}
 
 export async function getBarberDetails(barberId: string): Promise<Barber | null> {
   const supabase = createClient()
@@ -80,6 +119,22 @@ export async function getMainBarberId(barbershopId: string = BARBERSHOP_ID): Pro
     return null
   }
   return data?.id || null
+}
+
+export async function getAllBarbers(barbershopId: string = BARBERSHOP_ID): Promise<Barber[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('barbeiros')
+    .select('id, nome, foto_url')
+    .eq('barbearia_id', barbershopId)
+    .eq('ativo', true)
+    .order('nome')
+
+  if (error) {
+    console.error('[getAllBarbers] Erro:', error.message, '| code:', error.code)
+    return []
+  }
+  return data || []
 }
 
 export async function getBarberWorkingHours(barberId: string, dayOfWeek: number): Promise<WorkingHours | null> {
@@ -156,6 +211,7 @@ export async function getServicos(barbeariaId: string = BARBERSHOP_ID): Promise<
   const { data, error } = await supabase
     .from('servicos')
     .select('id, nome, duracao, preco')
+    .eq('barbearia_id', barbeariaId)
     .order('nome')
 
   if (error) {
@@ -195,7 +251,7 @@ export async function getServicos(barbeariaId: string = BARBERSHOP_ID): Promise<
   }))
 }
 
-export async function getAppointments(date: string, barbershopId: string = BARBERSHOP_ID): Promise<Appointment[]> {
+export async function getAppointments(date: string, barbershopId: string = BARBERSHOP_ID, barberId?: string): Promise<Appointment[]> {
   const supabase = createClient()
   // date é YYYY-MM-DD, referente ao dia em Brasília (UTC-3).
   // 00:00 Brasília = 03:00 UTC; 23:59 Brasília = 02:59 UTC no dia seguinte.
@@ -203,13 +259,19 @@ export async function getAppointments(date: string, barbershopId: string = BARBE
   const start = new Date(Date.UTC(year, month - 1, day, 3, 0, 0))
   const end = new Date(Date.UTC(year, month - 1, day + 1, 2, 59, 59))
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('agendamentos')
     .select('*, servicos(id, nome, preco, duracao, duracao_minutos)')
     .eq('barbearia_id', barbershopId)
     .gte('data_hora', start.toISOString())
     .lte('data_hora', end.toISOString())
     .not('status', 'in', '("cancelado","faltou")')
+
+  if (barberId) {
+    query = query.eq('barbeiro_id', barberId)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('Error fetching appointments:', error)

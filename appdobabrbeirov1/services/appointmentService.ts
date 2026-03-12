@@ -1,7 +1,6 @@
 import { supabase } from "@/lib/supabase"
 import { CompletedCut, TimeSlot, WorkingHours } from "@/types"
-
-const BARBER_ID = process.env.NEXT_PUBLIC_BARBEARIA_ID || '3088ce7e-4b1f-4b7e-a3fc-fc97bb1f5a43'
+import { getBarbeariaId, getBarbeiroId } from "@/lib/session-store"
 
 export const generateAvailableSlots = (
     date: string, // YYYY-MM-DD
@@ -195,7 +194,7 @@ export const fetchMainBarberId = async (): Promise<string | null> => {
         const { data, error } = await supabase
             .from('barbeiros')
             .select('id')
-            .eq('barbearia_id', BARBER_ID)
+            .eq('barbearia_id', getBarbeariaId())
             .limit(1)
             .maybeSingle() // Use maybeSingle instead of single to avoid PGRST116
         
@@ -212,7 +211,8 @@ export const fetchFinanceHistory = async (): Promise<CompletedCut[]> => {
         const { data, error } = await supabase
             .from('agendamentos')
             .select('*, servicos(id, nome, preco, duracao, duracao_minutos)')
-            .eq('barbearia_id', BARBER_ID)
+            .eq('barbearia_id', getBarbeariaId())
+            .eq('barbeiro_id', getBarbeiroId())
             .eq('status', 'concluido')
             .order('data_hora', { ascending: false })
             .limit(50)
@@ -245,7 +245,8 @@ export const fetchAppointments = async (date: Date): Promise<any[]> => {
         const { data, error } = await supabase
             .from('agendamentos')
             .select('*, servicos(id, nome, preco, duracao, duracao_minutos)')
-            .eq('barbearia_id', BARBER_ID)
+            .eq('barbearia_id', getBarbeariaId())
+            .eq('barbeiro_id', getBarbeiroId())
             .gte('data_hora', `${dateString} 00:00:00`)
             .lte('data_hora', `${dateString} 23:59:59`)
 
@@ -274,7 +275,8 @@ export const createAppointment = async (
     const { data: existing, error: checkError } = await supabase
         .from('agendamentos')
         .select('id')
-        .eq('barbearia_id', BARBER_ID)
+        .eq('barbearia_id', getBarbeariaId())
+        .eq('barbeiro_id', getBarbeiroId())
         .eq('data_hora', isoDate)
         .not('status', 'in', '("cancelado","faltou")') // Ignore cancelled
         .single()
@@ -287,7 +289,8 @@ export const createAppointment = async (
     const { error: aptError } = await supabase
         .from('agendamentos')
         .insert([{
-            barbearia_id: BARBER_ID,
+            barbearia_id: getBarbeariaId(),
+            barbeiro_id: getBarbeiroId(),
             cliente_id: clientId,
             servico_id: serviceId,
             data_hora: isoDate,
@@ -330,7 +333,7 @@ export const blockSlot = async (
     const { data, error } = await supabase
         .from('agendamentos')
         .insert([{
-            barbearia_id: BARBER_ID,
+            barbearia_id: getBarbeariaId(),
             barbeiro_id: barberId,
             data_hora: isoDate,
             status: 'bloqueado',
@@ -376,7 +379,7 @@ export const blockMultipleSlots = async (
         const slotDate = new Date(date)
         slotDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
         return {
-            barbearia_id: BARBER_ID,
+            barbearia_id: getBarbeariaId(),
             barbeiro_id: barberId,
             data_hora: slotDate.toISOString(),
             status: 'bloqueado' as const,
