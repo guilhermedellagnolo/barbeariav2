@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import { setSessionIds, clearSession } from "@/lib/session-store"
 import { User } from "@supabase/supabase-js"
@@ -34,8 +34,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Refs to keep track of state inside the listener without stale closures
+  const userRef = useRef<User | null>(null)
+  const barbeiroRef = useRef<BarbeiroInfo | null>(null)
+
+  // Update refs whenever state changes
+  useEffect(() => {
+    userRef.current = user
+    barbeiroRef.current = barbeiro
+  }, [user, barbeiro])
+
   // Resolve barbeiro record from auth user ID
-  // Esta função deve ser pura e não depender de estado externo se possível
   const resolveBarbeiro = async (userId: string): Promise<BarbeiroInfo | null> => {
     try {
       const { data, error: queryError } = await supabase
@@ -61,17 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true
     const initAuth = async () => {
       try {
-        // Restaurado: Check inicial ativo de sessão para evitar "loading infinito"
-        // se o listener demorar a disparar ou se a sessão já estiver ativa.
         const { data: { session } } = await supabase.auth.getSession()
 
         if (session?.user && mounted) {
-          // Se já temos sessão, não esperamos o listener (que pode ser preguiçoso)
           setUser(session.user)
+          userRef.current = session.user
+          
           const barberData = await resolveBarbeiro(session.user.id)
           if (mounted) {
              if (barberData) {
                 setBarbeiro(barberData)
+                barbeiroRef.current = barberData
                 setSessionIds(barberData.barbearia_id, barberData.id, barberData.nome)
                 setError(null)
              } else {
@@ -80,7 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
              setLoading(false)
           }
         } else if (mounted) {
-            // Se não tem sessão, libera o loading imediatamente (vai para login)
             setLoading(false)
         }
       } catch (err) {
@@ -91,35 +99,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initAuth()
     
-    // Listener continua existindo para monitorar mudanças (logout, refresh, login em outra aba)
+    // Listener continua existindo para monitorar mudanças
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
-      if (event === "TOKEN_REFRESHED" && user && session?.user?.id === user.id) {
-          // Não faz nada, apenas mantém o estado atual
+      const currentUser = userRef.current
+      const currentBarbeiro = barbeiroRef.current
+
+      // Se o evento for apenas refresh de token e já temos o usuário, não faz nada
+      if (event === "TOKEN_REFRESHED" && currentUser && session?.user?.id === currentUser.id) {
           return
       }
       
-      // Fix: Handle visibility change and focus events
-      if (event === "SIGNED_IN" && user && session?.user?.id === user.id) {
-          return
+      // Se o evento for SIGNED_IN (ex: tab focus) e já estamos logados com o mesmo usuário
+      if (event === "SIGNED_IN" && currentUser && session?.user?.id === currentUser.id) {
+          // Se já temos barbeiro carregado, ignoramos para não recarregar a tela
+          if (currentBarbeiro) return
       }
-      
-      // console.log("[Auth] Event:", event, session?.user?.email)
 
       if (session?.user) {
         // Se o usuário mudou ou se ainda não carregamos os dados do barbeiro
-        if (!user || user.id !== session.user.id || !barbeiro) {
+        if (!currentUser || currentUser.id !== session.user.id || !currentBarbeiro) {
             setUser(session.user)
+            userRef.current = session.user
             
-            // Só exibe loading se for uma troca real de usuário
-            if (!barbeiro) setLoading(true)
+            // Só exibe loading se for uma troca real de usuário e não tivermos dados
+            if (!currentBarbeiro) setLoading(true)
             
             const barberData = await resolveBarbeiro(session.user.id)
 
             if (mounted) {
                 if (barberData) {
                     setBarbeiro(barberData)
+                    barbeiroRef.current = barberData
                     setSessionIds(barberData.barbearia_id, barberData.id, barberData.nome)
                     setError(null)
                 } else {
@@ -133,6 +145,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mounted) {
             setUser(null)
             setBarbeiro(null)
+            userRef.current = null
+            barbeiroRef.current = null
+            
             clearSession()
             setError(null)
             setLoading(false)
@@ -144,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         mounted = false
         subscription.unsubscribe()
     }
-  }, []) // Remove dependências para rodar apenas no mount
+  }, []) 
 
   const signIn = async (email: string, password: string): Promise<{ error: string | null }> => {
     setError(null)
@@ -163,7 +178,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: message }
     }
 
-    // O onAuthStateChange vai lidar com o resto
     return { error: null }
   }
 
