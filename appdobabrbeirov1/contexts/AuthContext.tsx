@@ -95,8 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
-      // Se o evento for apenas refresh de token e já temos o usuário, não faz nada visualmente
       if (event === "TOKEN_REFRESHED" && user && session?.user?.id === user.id) {
+          // Não faz nada, apenas mantém o estado atual
+          return
+      }
+      
+      // Fix: Handle visibility change and focus events
+      if (event === "SIGNED_IN" && user && session?.user?.id === user.id) {
           return
       }
       

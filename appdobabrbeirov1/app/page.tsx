@@ -159,6 +159,7 @@ export default function BarberApp() {
     }
   }, [authLoading, user, router])
 
+  // Settings State
   const [activeTab, setActiveTab] = useState<TabType>("radar")
 
   // Settings State
