@@ -316,14 +316,6 @@ export default function BarberApp() {
     }
   }
 
-  // Define qual data usar para renderizar a lista de slots
-  // Se estiver no Radar, usa HOJE. Se estiver na Agenda, usa a data selecionada.
-  const renderDateKey = activeTab === 'radar' 
-    ? new Date().toLocaleDateString("pt-BR") 
-    : dateKey
-
-  const currentSlots = slotsByDate[renderDateKey] || []
-
   const isDayOff = currentSlots.length === 0 && !isLoading
 
   const todayStr = new Date().toLocaleDateString("pt-BR", {
