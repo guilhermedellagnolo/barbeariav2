@@ -59,10 +59,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize auth state on mount
   useEffect(() => {
     let mounted = true
+    const initAuth = async () => {
+      try {
+        // Restaurado: Check inicial ativo de sessão para evitar "loading infinito"
+        // se o listener demorar a disparar ou se a sessão já estiver ativa.
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (session?.user && mounted) {
+          // Se já temos sessão, não esperamos o listener (que pode ser preguiçoso)
+          setUser(session.user)
+          const barberData = await resolveBarbeiro(session.user.id)
+          if (mounted) {
+             if (barberData) {
+                setBarbeiro(barberData)
+                setSessionIds(barberData.barbearia_id, barberData.id, barberData.nome)
+                setError(null)
+             } else {
+                setError("Conta sem barbeiro vinculado.")
+             }
+             setLoading(false)
+          }
+        } else if (mounted) {
+            // Se não tem sessão, libera o loading imediatamente (vai para login)
+            setLoading(false)
+        }
+      } catch (err) {
+        console.warn("[Auth] Erro no check inicial:", err)
+        if (mounted) setLoading(false)
+      }
+    }
+
+    initAuth()
     
-    // Simplificado: Confia apenas no listener de onAuthStateChange para gerenciar o estado inicial
-    // Isso evita a race condition entre getSession() e onAuthStateChange() disparando juntos
-    
+    // Listener continua existindo para monitorar mudanças (logout, refresh, login em outra aba)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 

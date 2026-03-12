@@ -329,7 +329,7 @@ export const createAppointment = async (
     }
 
     // 4. Insert
-    const { error: aptError } = await supabase
+    const { data, error: aptError } = await supabase
         .from('agendamentos')
         .insert([{
             barbearia_id: getBarbeariaId(),
@@ -341,8 +341,12 @@ export const createAppointment = async (
             cliente_nome: clientName,
             cliente_telefone: clientPhone
         }])
+        .select('id') // CRITICAL: Return the ID
+        .single()
     
     if (aptError) throw aptError
+    
+    return { id: data.id }
 }
 
 export const updateAppointmentStatus = async (

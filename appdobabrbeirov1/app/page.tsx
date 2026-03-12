@@ -722,7 +722,7 @@ export default function BarberApp() {
               const slotTime = currentSlots[selectedSlotIndex].time
               const targetDate = getTargetDate() // USA A DATA DA ABA ATIVA (RADAR=HOJE, AGENDA=SELECIONADA)
               
-              await appointmentService.createAppointment(
+              const { id: newAppointmentId } = await appointmentService.createAppointment(
                   clientId,
                   selectedServiceId,
                   targetDate,
@@ -731,12 +731,13 @@ export default function BarberApp() {
                   newClientPhone
               )
 
-              // 3. Update Local State (Optimistic)
+              // 3. Update Local State (Optimistic but with ID)
               const updatedSlots = [...currentSlots]
               const service = services.find(s => s.id === selectedServiceId)
               
               updatedSlots[selectedSlotIndex] = {
                 ...updatedSlots[selectedSlotIndex],
+                id: newAppointmentId, // INJECT ID HERE
                 status: "ocupado",
                 clientName: newClientName,
                 clientPhone: newClientPhone,
