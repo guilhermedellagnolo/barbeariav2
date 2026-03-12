@@ -298,7 +298,13 @@ export const createAppointment = async (
     clientPhone: string
 ) => {
     const [hours, minutes] = time.split(':')
-    const appointmentDate = new Date(date)
+    
+    // Robust date construction to avoid timezone shifts
+    const y = date.getFullYear()
+    const mo = date.getMonth()
+    const d = date.getDate()
+    
+    const appointmentDate = new Date(y, mo, d)
     appointmentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
     
     // Converte para ISO string preservando o fuso horário local do browser

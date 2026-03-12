@@ -243,33 +243,52 @@ export default function BarberApp() {
     category: "corte"
   })
 
-  const dateKey = selectedDate.toLocaleDateString("pt-BR") 
+  const dateKey = selectedDate.toLocaleDateString("pt-BR")
   
+  // Define qual data usar para renderizar a lista de slots
+  // Se estiver no Radar, usa HOJE. Se estiver na Agenda, usa a data selecionada.
+  const renderDateKey = activeTab === 'radar' 
+    ? new Date().toLocaleDateString("pt-BR") 
+    : dateKey
+
+  const currentSlots = slotsByDate[renderDateKey] || []
+
+  // Helper to get the correct date based on active tab
+  const getTargetDate = () => {
+      if (activeTab === 'radar') {
+          return new Date()
+      }
+      return selectedDate
+  }
+
   // Ensure slots exist for the selected date
   useEffect(() => {
     if (!barbeiro) return
     fetchAppointments()
-  }, [dateKey, barbeiro])
+  }, [renderDateKey, barbeiro, activeTab]) // Depende da data de renderização correta
 
   const fetchAppointments = async () => {
     try {
-      const data = await appointmentService.fetchAppointments(selectedDate)
+      const targetDate = getTargetDate()
+      
+      const data = await appointmentService.fetchAppointments(targetDate)
       
       // Phase 4: Dynamic Slots Engine
       // 1. Get Barber ID from authenticated session
       const barberId = getBarbeiroId()
 
       if (!barberId) {
-          setSlotsByDate(prev => ({ ...prev, [dateKey]: [] }))
+          // Usa a data correta para a chave do estado
+          const key = targetDate.toLocaleDateString("pt-BR")
+          setSlotsByDate(prev => ({ ...prev, [key]: [] }))
           return
       }
 
       // 2. Get Working Hours for the selected day
-      const dayOfWeek = selectedDate.getDay() // 0 = Sunday
+      const dayOfWeek = targetDate.getDay() // 0 = Sunday
       const workingHours = await appointmentService.fetchBarberWorkingHours(barberId, dayOfWeek)
 
       // Hidrata o formulário de Ajustes com os valores do banco.
-      // .slice(0, 5) converte "08:00:00" → "08:00" para <input type="time"> reconhecer.
       if (workingHours) {
         setSettings(prev => ({
           ...prev,
@@ -282,21 +301,28 @@ export default function BarberApp() {
 
       // 3. Generate Slots using the Engine
       const slots = appointmentService.generateAvailableSlots(
-          selectedDate.toISOString().split('T')[0], // YYYY-MM-DD
+          targetDate.toISOString().split('T')[0], // YYYY-MM-DD
           workingHours,
           data || [],
           30, // grade padronizada em 30 min (MVP)
           false // isClientContext = false (Barber View)
       )
       
-      setSlotsByDate(prev => ({ ...prev, [dateKey]: slots }))
+      const key = targetDate.toLocaleDateString("pt-BR")
+      setSlotsByDate(prev => ({ ...prev, [key]: slots }))
 
     } catch (error) {
         console.error("Erro ao carregar agendamentos:", error)
     }
   }
 
-  const currentSlots = slotsByDate[dateKey] || []
+  // Define qual data usar para renderizar a lista de slots
+  // Se estiver no Radar, usa HOJE. Se estiver na Agenda, usa a data selecionada.
+  const renderDateKey = activeTab === 'radar' 
+    ? new Date().toLocaleDateString("pt-BR") 
+    : dateKey
+
+  const currentSlots = slotsByDate[renderDateKey] || []
 
   const isDayOff = currentSlots.length === 0 && !isLoading
 
@@ -335,6 +361,8 @@ export default function BarberApp() {
   // Async Action Handlers
   const handleConcluir = async (slotIndex: number, slot: TimeSlot) => {
     setIsLoading(true)
+    const targetDate = getTargetDate()
+    const key = targetDate.toLocaleDateString("pt-BR")
     try {
         const slotTime = slot.time
         
@@ -372,11 +400,11 @@ export default function BarberApp() {
                 clientName: slot.clientName,
                 value: revenueToAdd,
                 time: slot.time,
-                date: selectedDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+                date: targetDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
             }
             setCompletedCuts([newCut, ...completedCuts])
         }
-        setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
     } catch (error) {
         console.error("Erro ao concluir agendamento:", error)
         alert("Erro ao concluir agendamento.")
@@ -387,6 +415,8 @@ export default function BarberApp() {
 
   const handleFaltou = async (slotIndex: number, slot: TimeSlot) => {
     setIsLoading(true)
+    const targetDate = getTargetDate()
+    const key = targetDate.toLocaleDateString("pt-BR")
     try {
         const slotTime = slot.time
 
@@ -413,7 +443,7 @@ export default function BarberApp() {
                 await clientService.updateClientMetrics(client.id, client.cuts, client.revenue, client.noShows + 1)
             }
         }
-        setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
     } catch (error) {
         console.error("Erro ao registrar falta:", error)
         alert("Erro ao registrar falta.")
@@ -424,6 +454,8 @@ export default function BarberApp() {
 
   const handleCancelar = async (slotIndex: number) => {
     setIsLoading(true)
+    const targetDate = getTargetDate()
+    const key = targetDate.toLocaleDateString("pt-BR")
     try {
         const slot = currentSlots[slotIndex]
         const slotTime = slot.time
@@ -442,7 +474,7 @@ export default function BarberApp() {
             serviceId: undefined,
             price: undefined
         }
-        setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
     } catch (error) {
         console.error("Erro ao cancelar agendamento:", error)
         alert("Erro ao cancelar agendamento.")
@@ -453,24 +485,26 @@ export default function BarberApp() {
 
   const handleBloquear = async (slotIndex: number) => {
     setIsLoading(true)
+    const targetDate = getTargetDate()
+    const key = targetDate.toLocaleDateString("pt-BR")
     const previousSlots = [...currentSlots]
     try {
         // 1. Atualização otimista da UI
         const updatedSlots = [...currentSlots]
         updatedSlots[slotIndex] = { ...updatedSlots[slotIndex], status: "bloqueado" }
-        setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
 
         // 2. Persistir no Supabase
         const barberId = getBarbeiroId()
-        const newId = await appointmentService.blockSlot(selectedDate, currentSlots[slotIndex].time, barberId)
+        const newId = await appointmentService.blockSlot(targetDate, currentSlots[slotIndex].time, barberId)
 
         // 3. Atualiza o ID do slot para permitir desbloqueio posterior
         updatedSlots[slotIndex] = { ...updatedSlots[slotIndex], id: newId }
-        setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
     } catch (error) {
         console.error("Erro ao bloquear horário:", error)
         // Reverte o estado local em caso de falha
-        setSlotsByDate({ ...slotsByDate, [dateKey]: previousSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: previousSlots })
         alert("Erro ao bloquear horário. Tente novamente.")
     } finally {
         setIsLoading(false)
@@ -479,6 +513,8 @@ export default function BarberApp() {
 
   const handleDesbloquear = async (slotIndex: number) => {
     setIsLoading(true)
+    const targetDate = getTargetDate()
+    const key = targetDate.toLocaleDateString("pt-BR")
     const previousSlots = [...currentSlots]
     try {
         const slot = currentSlots[slotIndex]
@@ -492,10 +528,10 @@ export default function BarberApp() {
         // Atualiza a UI após sucesso
         const updatedSlots = [...currentSlots]
         updatedSlots[slotIndex] = { ...updatedSlots[slotIndex], status: "livre", id: undefined }
-        setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
     } catch (error) {
         console.error("Erro ao desbloquear horário:", error)
-        setSlotsByDate({ ...slotsByDate, [dateKey]: previousSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: previousSlots })
         alert("Erro ao desbloquear horário. Tente novamente.")
     } finally {
         setIsLoading(false)
@@ -504,6 +540,8 @@ export default function BarberApp() {
 
   const handleBloquearDia = async () => {
     setIsLoading(true)
+    const targetDate = getTargetDate()
+    const key = targetDate.toLocaleDateString("pt-BR")
     const previousSlots = [...currentSlots]
     try {
         // 1. Identifica todos os slots livres para bloquear
@@ -517,21 +555,21 @@ export default function BarberApp() {
         const updatedSlots = currentSlots.map(slot =>
             slot.status === "livre" ? { ...slot, status: "bloqueado" as const } : { ...slot }
         )
-        setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
 
         // 3. Persistir no Supabase (batch insert)
         const barberId = getBarbeiroId()
-        const results = await appointmentService.blockMultipleSlots(selectedDate, slotsToBlock, barberId)
+        const results = await appointmentService.blockMultipleSlots(targetDate, slotsToBlock, barberId)
 
         // 4. Atualiza IDs retornados no estado local
         const finalSlots = updatedSlots.map(slot => {
             const match = results.find(r => r.time === slot.time)
             return match ? { ...slot, id: match.id } : slot
         })
-        setSlotsByDate({ ...slotsByDate, [dateKey]: finalSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: finalSlots })
     } catch (error) {
         console.error("Erro ao bloquear dia:", error)
-        setSlotsByDate({ ...slotsByDate, [dateKey]: previousSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: previousSlots })
         alert("Erro ao bloquear dia inteiro. Tente novamente.")
     } finally {
         setIsLoading(false)
@@ -540,6 +578,8 @@ export default function BarberApp() {
 
   const handleDesbloquearDia = async () => {
     setIsLoading(true)
+    const targetDate = getTargetDate()
+    const key = targetDate.toLocaleDateString("pt-BR")
     const previousSlots = [...currentSlots]
     try {
         // 1. Coleta IDs dos slots bloqueados manualmente (que possuem ID no banco).
@@ -555,7 +595,7 @@ export default function BarberApp() {
                 ? { ...slot, status: "livre" as const, id: undefined }
                 : { ...slot }
         )
-        setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
 
         // 3. Persistir no Supabase (batch delete)
         if (idsToUnblock.length > 0) {
@@ -563,7 +603,7 @@ export default function BarberApp() {
         }
     } catch (error) {
         console.error("Erro ao desbloquear dia:", error)
-        setSlotsByDate({ ...slotsByDate, [dateKey]: previousSlots })
+        setSlotsByDate({ ...slotsByDate, [key]: previousSlots })
         alert("Erro ao desbloquear dia inteiro. Tente novamente.")
     } finally {
         setIsLoading(false)
@@ -683,11 +723,12 @@ export default function BarberApp() {
           // 2. Create Appointment
           if (clientId) {
               const slotTime = currentSlots[selectedSlotIndex].time
+              const targetDate = getTargetDate() // USA A DATA DA ABA ATIVA (RADAR=HOJE, AGENDA=SELECIONADA)
               
               await appointmentService.createAppointment(
                   clientId,
                   selectedServiceId,
-                  selectedDate,
+                  targetDate,
                   slotTime,
                   newClientName,
                   newClientPhone
@@ -706,7 +747,8 @@ export default function BarberApp() {
                 serviceId: service?.id,
                 price: service?.price || 0
               }
-              setSlotsByDate({ ...slotsByDate, [dateKey]: updatedSlots })
+              const key = targetDate.toLocaleDateString("pt-BR")
+              setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
               setIsEncaixeModalOpen(false)
           }
 
