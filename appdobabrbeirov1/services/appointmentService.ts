@@ -292,31 +292,29 @@ export const createAppointment = async (
     clientName: string,
     clientPhone: string
 ) => {
-    const [hours, minutes] = time.split(':')
+    // 1. Constrói a data com o horário específico
+    const [hours, minutes] = time.split(':').map(Number)
     
-    // Robust date construction to avoid timezone shifts
+    // Cria um objeto Date local para extrair ano/mês/dia corretos
     const y = date.getFullYear()
-    const mo = date.getMonth()
+    const mo = date.getMonth() // 0-indexed
     const d = date.getDate()
     
-    const appointmentDate = new Date(y, mo, d)
-    appointmentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0)
-    
-    // Converte para ISO string preservando o fuso horário local do browser
-    // O backend/banco deve lidar com timestamptz ou simplesmente armazenar o ISO enviado
-    // Ajuste para garantir que o dia não mude devido a conversão UTC
-    const isoDate = appointmentDate.toString() // Use local string representation for debugging, or construct ISO manually
-    
-    // Melhor abordagem: Construir ISO string manualmente baseada na data local
-    const year = appointmentDate.getFullYear()
-    const month = String(appointmentDate.getMonth() + 1).padStart(2, '0')
-    const day = String(appointmentDate.getDate()).padStart(2, '0')
-    const h = String(appointmentDate.getHours()).padStart(2, '0')
-    const m = String(appointmentDate.getMinutes()).padStart(2, '0')
+    // 2. Formatação Manual ISO 8601 com Offset fixo de Brasília (-03:00)
+    // Isso garante que o Supabase receba o horário exato que o usuário vê,
+    // independentemente do fuso horário do servidor/browser que está rodando este código.
+    const year = y
+    const month = String(mo + 1).padStart(2, '0')
+    const day = String(d).padStart(2, '0')
+    const h = String(hours).padStart(2, '0')
+    const m = String(minutes).padStart(2, '0')
     const s = '00'
-    const formattedDate = `${year}-${month}-${day}T${h}:${m}:${s}` // YYYY-MM-DDTHH:mm:ss (sem Z, assume local/postgres config)
+    
+    // Formato: YYYY-MM-DDTHH:mm:ss-03:00
+    // O Site do Cliente espera que os horários estejam salvos com este offset ou UTC equivalente.
+    const formattedDate = `${year}-${month}-${day}T${h}:${m}:${s}-03:00`
 
-    // 1. Check Availability (Race Condition Prevention)
+    // 3. Check Availability (Race Condition Prevention)
     const { data: existing, error: checkError } = await supabase
         .from('agendamentos')
         .select('id')
@@ -330,7 +328,7 @@ export const createAppointment = async (
         throw new Error("Este horário já foi ocupado por outro cliente.")
     }
 
-    // 2. Insert
+    // 4. Insert
     const { error: aptError } = await supabase
         .from('agendamentos')
         .insert([{
@@ -377,7 +375,8 @@ export const blockSlot = async (
     const h = String(hours).padStart(2, '0')
     const m = String(minutes).padStart(2, '0')
     const s = '00'
-    const formattedDate = `${year}-${month}-${day}T${h}:${m}:${s}`
+    // Fix: Force -03:00 offset
+    const formattedDate = `${year}-${month}-${day}T${h}:${m}:${s}-03:00`
 
     const { data, error } = await supabase
         .from('agendamentos')
@@ -432,7 +431,8 @@ export const blockMultipleSlots = async (
         const h = String(hours).padStart(2, '0')
         const m = String(minutes).padStart(2, '0')
         const s = '00'
-        const formattedDate = `${year}-${month}-${day}T${h}:${m}:${s}`
+        // Fix: Force -03:00 offset
+        const formattedDate = `${year}-${month}-${day}T${h}:${m}:${s}-03:00`
         
         return {
             barbearia_id: getBarbeariaId(),

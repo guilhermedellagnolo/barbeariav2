@@ -52,25 +52,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize auth state on mount
   useEffect(() => {
+    let mounted = true
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        // Timeout de segurança para evitar loading infinito se o Supabase demorar
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout de autenticação")), 5000)
+        )
 
-        if (session?.user) {
+        const sessionPromise = supabase.auth.getSession()
+
+        const result: any = await Promise.race([sessionPromise, timeoutPromise])
+        const { data: { session } } = result
+
+        if (session?.user && mounted) {
           setUser(session.user)
           const barberData = await resolveBarbeiro(session.user.id)
 
-          if (barberData) {
+          if (barberData && mounted) {
             setBarbeiro(barberData)
             setSessionIds(barberData.barbearia_id, barberData.id, barberData.nome)
-          } else {
+          } else if (mounted) {
             setError("Sua conta existe mas nenhum barbeiro foi vinculado a ela. Contate o administrador.")
           }
         }
       } catch (err) {
         console.error("[Auth] Erro na inicialização:", err)
       } finally {
-        setLoading(false)
+        if (mounted) setLoading(false)
       }
     }
 
@@ -78,15 +87,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth state changes (login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+
       if (event === "SIGNED_IN" && session?.user) {
         setUser(session.user)
+        // Ensure loading is true while resolving barber
+        setLoading(true) 
         const barberData = await resolveBarbeiro(session.user.id)
 
-        if (barberData) {
+        if (barberData && mounted) {
           setBarbeiro(barberData)
           setSessionIds(barberData.barbearia_id, barberData.id, barberData.nome)
           setError(null)
-        } else {
+        } else if (mounted) {
           setError("Sua conta existe mas nenhum barbeiro foi vinculado a ela. Contate o administrador.")
         }
       } else if (event === "SIGNED_OUT") {
@@ -100,10 +113,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       // Ensure loading is set to false after any auth event
-      setLoading(false)
+      if (mounted) setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+        mounted = false
+        subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = async (email: string, password: string): Promise<{ error: string | null }> => {

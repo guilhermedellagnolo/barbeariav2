@@ -909,11 +909,12 @@ export default function BarberApp() {
   const renderContent = () => {
     switch (activeTab) {
       case "radar":
+        const radarDate = new Date().toLocaleDateString("pt-BR")
         return (
           <main className="p-4">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Agenda do Dia ({renderDateKey})
+                Agenda do Dia ({radarDate})
               </h2>
               <span className="text-xs text-muted-foreground">
                 {currentSlots.filter((s) => s.status === "ocupado").length} agendamentos
