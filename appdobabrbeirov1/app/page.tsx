@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { supabase } from "@/lib/supabase"
-import { getBarbeiroId } from "@/lib/session-store"
+import { getBarbeiroId, setSessionIds } from "@/lib/session-store"
 import {
   Radar,
   Calendar,
@@ -196,8 +196,8 @@ export default function BarberApp() {
             
             if (data) {
                 setBarbeiro(data)
-                // Set global session helpers if needed, but prefer local usage
-                // setSessionIds(data.barbearia_id, data.id, data.nome)
+                // Set global session helpers needed for services
+                setSessionIds(data.barbearia_id, data.id, data.nome)
             } else {
                 setProfileError("Barbeiro não encontrado ou inativo.")
             }
