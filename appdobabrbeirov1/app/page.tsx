@@ -407,6 +407,12 @@ export default function BarberApp() {
             setCompletedCuts([newCut, ...completedCuts])
         }
         setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
+
+        // 4. Update Real Finance Metrics (Semana/Mes)
+        // Isso garante que os cards de financas sejam atualizados sem reload
+        const newMetrics = await appointmentService.fetchFinanceMetrics()
+        setFinanceMetrics(newMetrics)
+
     } catch (error) {
         console.error("Erro ao concluir agendamento:", error)
         alert("Erro ao concluir agendamento.")
@@ -736,22 +742,8 @@ export default function BarberApp() {
                   newClientPhone
               )
 
-              // 3. Update Local State (Optimistic but with ID)
-              const updatedSlots = [...currentSlots]
-              const service = services.find(s => s.id === selectedServiceId)
-              
-              updatedSlots[selectedSlotIndex] = {
-                ...updatedSlots[selectedSlotIndex],
-                id: newAppointmentId, // INJECT ID HERE
-                status: "ocupado",
-                clientName: newClientName,
-                clientPhone: newClientPhone,
-                service: service?.name || "Serviço",
-                serviceId: service?.id,
-                price: service?.price || 0
-              }
-              const key = targetDate.toLocaleDateString("pt-BR")
-              setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
+              // 3. Force Refresh (Recarrega slots para calcular ocupação correta e evitar duplicidade visual)
+              await fetchAppointments()
               setIsEncaixeModalOpen(false)
           }
 
@@ -1019,19 +1011,30 @@ export default function BarberApp() {
 
             {/* Slots List */}
             <div className="space-y-2">
-              {currentSlots.map((slot, index) => (
-                <SlotCard
-                  key={slot.time}
-                  slot={slot}
-                  onEncaixe={() => handleEncaixe(index)}
-                  onBloquear={() => openConfirmation("bloquear", slot.time)}
-                  onDesbloquear={() => openConfirmation("desbloquear", slot.time)}
-                  onConcluir={() => openConfirmation("concluir", slot.time)}
-                  onFaltou={() => openConfirmation("faltou", slot.time)}
-                  onCancelar={() => openConfirmation("cancelar", slot.time)}
-                  onWhatsApp={() => handleWhatsApp(slot.clientPhone)}
-                />
-              ))}
+              {currentSlots.map((slot, index) => {
+                 // DEDUPLICATION LOGIC:
+                 // Se o slot atual tem o mesmo ID do anterior, significa que é continuação de um serviço longo.
+                 // Neste caso, não renderizamos este slot (o anterior já ocupa o espaço visualmente se fizéssemos um card maior, 
+                 // mas como o pedido é "mostrar o próximo horário livre", apenas ocultar já resolve a duplicidade visual).
+                 const prevSlot = index > 0 ? currentSlots[index - 1] : null
+                 if (slot.id && prevSlot?.id === slot.id && slot.status !== 'livre') {
+                     return null
+                 }
+
+                 return (
+                    <SlotCard
+                      key={slot.time}
+                      slot={slot}
+                      onEncaixe={() => handleEncaixe(index)}
+                      onBloquear={() => openConfirmation("bloquear", slot.time)}
+                      onDesbloquear={() => openConfirmation("desbloquear", slot.time)}
+                      onConcluir={() => openConfirmation("concluir", slot.time)}
+                      onFaltou={() => openConfirmation("faltou", slot.time)}
+                      onCancelar={() => openConfirmation("cancelar", slot.time)}
+                      onWhatsApp={() => handleWhatsApp(slot.clientPhone)}
+                    />
+                 )
+              })}
             </div>
           </main>
         )
