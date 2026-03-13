@@ -151,7 +151,12 @@ const generateSlots = (openTime: string, closeTime: string, intervalMinutes: num
 
 export default function BarberApp() {
   const router = useRouter()
-  const { user, barbeiro, loading: authLoading, signOut, error: authError } = useAuth()
+  const { user, loading: authLoading, signOut } = useAuth()
+  
+  // Local State para dados do Barbeiro (Desacoplado do AuthContext)
+  const [barbeiro, setBarbeiro] = useState<any | null>(null)
+  const [loadingProfile, setLoadingProfile] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
 
   // Redirect to login if not authenticated with Safety Timeout
   useEffect(() => {
@@ -162,7 +167,6 @@ export default function BarberApp() {
     }
 
     // 2. Safety Timeout: Se travar no loading por 5s, força recarregamento da página (não logout)
-    // Isso é melhor que logout forçado pois pode ser apenas instabilidade de rede
     const safetyTimeout = setTimeout(() => {
         if (authLoading) {
             console.warn("Auth loading timed out. Reloading page...")
@@ -172,6 +176,41 @@ export default function BarberApp() {
 
     return () => clearTimeout(safetyTimeout)
   }, [authLoading, user, router])
+
+  // Fetch Barber Profile when User is Ready
+  useEffect(() => {
+    if (!user) return
+
+    async function loadBarberProfile() {
+        setLoadingProfile(true)
+        setProfileError(null)
+        try {
+            const { data, error } = await supabase
+                .from("barbeiros")
+                .select("id, barbearia_id, nome")
+                .eq("usuario_id", user!.id)
+                .eq("ativo", true)
+                .maybeSingle()
+
+            if (error) throw error
+            
+            if (data) {
+                setBarbeiro(data)
+                // Set global session helpers if needed, but prefer local usage
+                // setSessionIds(data.barbearia_id, data.id, data.nome)
+            } else {
+                setProfileError("Barbeiro não encontrado ou inativo.")
+            }
+        } catch (err: any) {
+            console.error("Error loading profile:", err)
+            setProfileError("Erro ao carregar perfil. Verifique sua conexão.")
+        } finally {
+            setLoadingProfile(false)
+        }
+    }
+
+    loadBarberProfile()
+  }, [user])
 
   // Realtime Updates (Notificações)
   useEffect(() => {
@@ -332,8 +371,8 @@ export default function BarberApp() {
       const data = await appointmentService.fetchAppointments(dateStr)
       
       // Phase 4: Dynamic Slots Engine
-      // 1. Get Barber ID from authenticated session
-      const barberId = getBarbeiroId()
+      // 1. Get Barber ID directly from state
+      const barberId = barbeiro?.id
 
       if (!barberId) {
           // Usa a data correta para a chave do estado
@@ -551,7 +590,7 @@ export default function BarberApp() {
         setSlotsByDate({ ...slotsByDate, [key]: updatedSlots })
 
         // 2. Persistir no Supabase
-        const barberId = getBarbeiroId()
+        const barberId = barbeiro?.id
         const newId = await appointmentService.blockSlot(targetDate, currentSlots[slotIndex].time, barberId)
 
         // 3. Atualiza o ID do slot para permitir desbloqueio posterior
@@ -813,7 +852,7 @@ export default function BarberApp() {
   const handleSaveSettings = async () => {
     setIsLoading(true)
     try {
-        const barberId = getBarbeiroId()
+        const barberId = barbeiro?.id
 
         // Apply settings to Monday (1) through Saturday (6)
         const days = [1, 2, 3, 4, 5, 6]
@@ -1338,45 +1377,29 @@ export default function BarberApp() {
   }
 
   // ─── Auth Guards ─────────────────────────────────────────────────────────
-  if (authLoading) {
+  if (authLoading || loadingProfile) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto mb-3" />
-          <p className="text-zinc-400 text-sm">Carregando...</p>
+          <p className="text-zinc-400 text-sm">{authLoading ? "Autenticando..." : "Carregando perfil..."}</p>
         </div>
       </div>
     )
   }
 
-  if (!barbeiro) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto mb-3" />
-          <p className="text-zinc-400 text-sm">
-            {authError ? "Erro ao carregar perfil." : "Carregando perfil..."}
-          </p>
-          {authError && (
-             <Button onClick={signOut} variant="link" className="text-amber-500 mt-2">
-               Tentar novamente
-             </Button>
-          )}
-        </div>
-      </div>
-    )
-  }
+  if (!user) return null // Will redirect via useEffect
 
-  if (authError) {
+  if (!barbeiro || profileError) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
-          <p className="text-red-400 text-sm mb-4">{authError}</p>
+          <p className="text-red-400 text-sm mb-4">{profileError || "Erro desconhecido ao carregar perfil."}</p>
           <button
             onClick={signOut}
             className="px-4 py-2 rounded-lg bg-zinc-800 text-white text-sm hover:bg-zinc-700 transition-colors"
           >
-            Voltar ao Login
+            Sair e Tentar Novamente
           </button>
         </div>
       </div>
