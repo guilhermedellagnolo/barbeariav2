@@ -822,14 +822,24 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
             <div>
               <h4 className="text-lg font-semibold text-foreground mb-4">Contato</h4>
               <div className="space-y-3">
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <MapPin className="h-5 w-5 text-primary" />
+                <a 
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoBarbearia)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 text-muted-foreground hover:text-primary transition-colors"
+                  title="Ver no Google Maps"
+                >
+                  <MapPin className="h-5 w-5 text-primary flex-shrink-0" />
                   <span>{enderecoBarbearia}</span>
-                </div>
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <Phone className="h-5 w-5 text-primary" />
+                </a>
+                <a 
+                  href={`tel:${telefoneBarbearia.replace(/\D/g, '')}`}
+                  className="flex items-center gap-3 text-muted-foreground hover:text-primary transition-colors"
+                  title="Ligar para barbearia"
+                >
+                  <Phone className="h-5 w-5 text-primary flex-shrink-0" />
                   <span>{telefoneBarbearia}</span>
-                </div>
+                </a>
               </div>
             </div>
 
