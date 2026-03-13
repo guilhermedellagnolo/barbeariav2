@@ -70,7 +70,7 @@ export async function middleware(request: NextRequest) {
 
   // 4. VERIFICAÇÃO DE EMAIL (Hardcoded Security)
   // Se estiver logado, mas o email não for o seu -> Bloqueia
-  const ALLOWED_EMAIL = 'guilherme.delagnolo@gmail.com'
+  const ALLOWED_EMAIL = 't3barber@gmail.com'
   if (user && user.email !== ALLOWED_EMAIL) {
     // Retorna erro 403 Forbidden
     return new NextResponse(

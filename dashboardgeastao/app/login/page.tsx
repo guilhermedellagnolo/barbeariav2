@@ -43,7 +43,7 @@ export default function LoginPage() {
 
       // 2. Verificação HARDCODED de Segurança (Camada Extra)
       // Só permite o SEU email. Qualquer outro login válido é bloqueado aqui.
-      const ALLOWED_EMAIL = 'guilherme.delagnolo@gmail.com'
+      const ALLOWED_EMAIL = 't3barber@gmail.com'
       
       if (data.user?.email !== ALLOWED_EMAIL) {
         await supabase.auth.signOut() // Desloga imediatamente

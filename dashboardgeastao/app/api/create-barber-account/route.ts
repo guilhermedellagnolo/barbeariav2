@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Hardcoded Security Check
-    const ALLOWED_EMAIL = 'guilherme.delagnolo@gmail.com'
+    const ALLOWED_EMAIL = 't3barber@gmail.com'
     if (!user || user.email !== ALLOWED_EMAIL) {
         return NextResponse.json({ error: "Acesso não autorizado." }, { status: 403 })
     }
