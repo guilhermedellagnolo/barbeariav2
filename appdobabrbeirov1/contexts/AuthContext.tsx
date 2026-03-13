@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react"
+import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 import { supabase } from "@/lib/supabase"
 import { setSessionIds, clearSession } from "@/lib/session-store"
 import { User } from "@supabase/supabase-js"
@@ -34,16 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Refs to keep track of state inside the listener without stale closures
-  const userRef = useRef<User | null>(null)
-  const barbeiroRef = useRef<BarbeiroInfo | null>(null)
-
-  // Update refs whenever state changes
-  useEffect(() => {
-    userRef.current = user
-    barbeiroRef.current = barbeiro
-  }, [user, barbeiro])
-
   // Resolve barbeiro record from auth user ID
   const resolveBarbeiro = async (userId: string): Promise<BarbeiroInfo | null> => {
     try {
@@ -68,91 +58,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize auth state on mount
   useEffect(() => {
     let mounted = true
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
 
-        if (session?.user && mounted) {
-          setUser(session.user)
-          userRef.current = session.user
-          
-          const barberData = await resolveBarbeiro(session.user.id)
-          if (mounted) {
-             if (barberData) {
-                setBarbeiro(barberData)
-                barbeiroRef.current = barberData
-                setSessionIds(barberData.barbearia_id, barberData.id, barberData.nome)
-                setError(null)
-             } else {
-                setError("Conta sem barbeiro vinculado.")
-             }
-             setLoading(false)
-          }
-        } else if (mounted) {
-            setLoading(false)
-        }
-      } catch (err) {
-        console.warn("[Auth] Erro no check inicial:", err)
-        if (mounted) setLoading(false)
-      }
-    }
+    // Função única para lidar com a sessão
+    const handleSession = async (sessionUser: User | null) => {
+        if (!mounted) return
 
-    initAuth()
-    
-    // Listener continua existindo para monitorar mudanças
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
+        if (sessionUser) {
+            setUser(sessionUser)
+            // Se já temos barbeiro carregado para este usuário, não recarrega
+            // Isso evita piscar loading se for apenas refresh de token
+            if (barbeiro && user?.id === sessionUser.id) {
+                setLoading(false)
+                return
+            }
 
-      const currentUser = userRef.current
-      const currentBarbeiro = barbeiroRef.current
-
-      // Se o evento for apenas refresh de token e já temos o usuário, não faz nada
-      if (event === "TOKEN_REFRESHED" && currentUser && session?.user?.id === currentUser.id) {
-          return
-      }
-      
-      // Se o evento for SIGNED_IN (ex: tab focus) e já estamos logados com o mesmo usuário
-      if (event === "SIGNED_IN" && currentUser && session?.user?.id === currentUser.id) {
-          // Se já temos barbeiro carregado, ignoramos para não recarregar a tela
-          if (currentBarbeiro) return
-      }
-
-      if (session?.user) {
-        // Se o usuário mudou ou se ainda não carregamos os dados do barbeiro
-        if (!currentUser || currentUser.id !== session.user.id || !currentBarbeiro) {
-            setUser(session.user)
-            userRef.current = session.user
+            // Busca dados do barbeiro
+            const barberData = await resolveBarbeiro(sessionUser.id)
             
-            // Só exibe loading se for uma troca real de usuário e não tivermos dados
-            if (!currentBarbeiro) setLoading(true)
-            
-            const barberData = await resolveBarbeiro(session.user.id)
-
             if (mounted) {
                 if (barberData) {
                     setBarbeiro(barberData)
-                    barbeiroRef.current = barberData
                     setSessionIds(barberData.barbearia_id, barberData.id, barberData.nome)
                     setError(null)
                 } else {
-                    setError("Conta sem barbeiro vinculado.")
+                    setBarbeiro(null)
+                    setError("Conta sem barbeiro vinculado ou inativa.")
                 }
                 setLoading(false)
             }
+        } else {
+            // Sem usuário (Logout ou não logado)
+            if (mounted) {
+                setUser(null)
+                setBarbeiro(null)
+                clearSession()
+                setError(null)
+                setLoading(false)
+            }
         }
-      } else {
-        // Sem sessão (Logout ou não logado)
-        if (mounted) {
-            setUser(null)
-            setBarbeiro(null)
-            userRef.current = null
-            barbeiroRef.current = null
-            
-            clearSession()
-            setError(null)
-            setLoading(false)
-        }
-      }
+    }
+
+    // 1. Check Inicial (Get Session)
+    // Usamos getSession para estado inicial rápido (cache local)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        handleSession(session?.user ?? null)
+    }).catch(err => {
+        console.warn("[Auth] Erro no check inicial:", err)
+        if (mounted) setLoading(false)
+    })
+    
+    // 2. Listener para mudanças (Login, Logout, Refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // O evento INITIAL_SESSION pode disparar logo após getSession
+      // Mas nossa função handleSession é idempotente para o mesmo usuário
+      await handleSession(session?.user ?? null)
     })
 
     return () => {
@@ -178,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: message }
     }
 
+    // O onAuthStateChange vai capturar o sucesso e atualizar o estado
     return { error: null }
   }
 
