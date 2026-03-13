@@ -1445,20 +1445,20 @@ export default function BarberApp() {
       {renderContent()}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-card shadow-lg">
-        <div className="flex items-center justify-around py-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-card shadow-lg pb-safe">
+        <div className="flex items-center justify-between px-2 py-2 overflow-x-auto no-scrollbar gap-1 sm:justify-around sm:gap-0">
           {navItems.map((item) => (
             <button
               key={item.tab}
               onClick={() => setActiveTab(item.tab)}
-              className={`flex flex-col items-center gap-1 px-4 py-2 transition-colors ${
+              className={`flex flex-col items-center justify-center min-w-[64px] py-1 transition-colors rounded-md ${
                 activeTab === item.tab
                   ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
               }`}
             >
-              <item.icon className={`h-5 w-5 ${activeTab === item.tab ? "stroke-[2.5]" : ""}`} />
-              <span className="text-xs font-medium">{item.label}</span>
+              <item.icon className={`h-5 w-5 mb-1 ${activeTab === item.tab ? "stroke-[2.5]" : ""}`} />
+              <span className="text-[10px] font-medium leading-none">{item.label}</span>
             </button>
           ))}
         </div>
