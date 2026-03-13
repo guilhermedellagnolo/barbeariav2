@@ -400,7 +400,7 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
       {/* Hero Section */}
       <section className="relative min-h-screen flex flex-col">
         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${heroBackground}')` }}>
-          <div className="absolute inset-0 bg-background/90" />
+          <div className="absolute inset-0 bg-black/60" /> {/* Ajustado para bg-black/60 para melhor contraste com imagem visível */}
         </div>
 
         <header className="relative z-10 flex items-center justify-between px-6 py-6 lg:px-12">
