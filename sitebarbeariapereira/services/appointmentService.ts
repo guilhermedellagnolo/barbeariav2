@@ -477,3 +477,45 @@ export async function cancelAppointment(appointmentId: string) {
     throw updateError
   }
 }
+
+export async function ensureClientExists(
+  userId: string,
+  name: string,
+  phone: string,
+  barbeariaId: string
+): Promise<string | null> {
+  const supabase = createClient()
+
+  // 1. Tenta buscar existente
+  const { data: existing } = await supabase
+    .from('clientes')
+    .select('id, nome, telefone')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (existing) {
+    // Se quiser atualizar dados, pode fazer aqui.
+    // Ex: se o usuário trocou o nome no input, atualizamos no banco?
+    // Por simplicidade, vamos manter o que está no banco ou atualizar se estiver vazio.
+    return existing.id
+  }
+
+  // 2. Cria novo
+  const { data: newClient, error } = await supabase
+    .from('clientes')
+    .insert({
+      user_id: userId,
+      nome: name,
+      telefone: phone,
+      barbearia_id: barbeariaId
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error('[ensureClientExists] Erro ao criar cliente:', error)
+    return null
+  }
+
+  return newClient.id
+}

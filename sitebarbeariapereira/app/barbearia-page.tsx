@@ -35,6 +35,7 @@ import {
   getAppointments,
   generateAvailableSlots,
   createAppointment,
+  ensureClientExists, // Importado
   getServicos,
   getBarbearia,
   Barber,
@@ -139,7 +140,8 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
       setUser(user)
 
       if (user) {
-        const { data } = await supabase.from('clientes').select('*').eq('user_id', user.id).single()
+        // Usa maybeSingle() para evitar erro 406/PGRST116 quando não existe
+        const { data } = await supabase.from('clientes').select('*').eq('user_id', user.id).maybeSingle()
         if (data) {
           setClientRecord(data)
           setFormData({ name: data.nome || "", whatsapp: data.telefone || "" })
@@ -276,10 +278,24 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
 
     const dateStr = formatDateForApi(days[selectedDay])
 
+    // 1. Garante que o cliente existe (cria se for o primeiro agendamento)
+    let finalClientId = clientRecord?.id || null
+    
+    if (user && !finalClientId) {
+       // Se tem usuario logado mas nao tem clientRecord, cria agora
+       finalClientId = await ensureClientExists(user.id, formData.name, formData.whatsapp, barbeariaId)
+       // Atualiza estado local para proximas vezes
+       if (finalClientId) {
+          // Busca o registro completo apenas para manter consistencia do estado, se necessario
+          // ou apenas monta um objeto parcial
+          setClientRecord({ id: finalClientId, nome: formData.name, telefone: formData.whatsapp, user_id: user.id })
+       }
+    }
+
     const result = await createAppointment(
       barbeariaId,
       selectedBarber.id,
-      clientRecord?.id || null,
+      finalClientId, // Usa o ID garantido (ou null se falhou/guest)
       formData.name,
       formData.whatsapp,
       dateStr,
