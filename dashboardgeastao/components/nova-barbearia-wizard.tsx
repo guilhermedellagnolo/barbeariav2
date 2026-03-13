@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils"
 import { ImageUpload } from "@/components/image-upload"
 import { uploadFotoFundo, uploadFotoBarbeiro, uploadFotoGaleria } from "@/services/uploadService"
-import type { NovaBarbearia, Plano } from "@/lib/types"
+import { LivePreviewMockup } from "@/components/live-preview-mockup" // Importar Mockup
 
 interface NovaBarbeariaWizardProps {
   onBack: () => void
@@ -287,190 +287,214 @@ export function NovaBarbeariaWizard({ onBack, onCreate, saving }: NovaBarbeariaW
 
       {/* Step 2: Personalização */}
       {currentStep === 2 && (
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">Personalização do Site</CardTitle>
-            <CardDescription>
-              Configure a aparência e informações do site
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="slogan">Slogan Principal</Label>
-                <Input
-                  id="slogan"
-                  value={data.slogan_principal}
-                  onChange={(e) => updateField("slogan_principal", e.target.value)}
-                  placeholder="Ex: Tradição e estilo desde 2010"
-                  className="bg-background border-input"
-                />
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {[
-                    "Seu estilo, nossa tradição.",
-                    "Cortes clássicos, estilo moderno.",
-                    "A melhor hora do seu dia.",
-                    "Cuidando do seu visual."
-                  ].map((suggestion) => (
-                    <Button
-                      key={suggestion}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs h-7 px-2"
-                      onClick={() => updateField("slogan_principal", suggestion)}
-                    >
-                      {suggestion}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ano_fundacao">Ano de Fundação</Label>
-                <Input
-                  id="ano_fundacao"
-                  type="number"
-                  value={data.ano_fundacao}
-                  onChange={(e) => updateField("ano_fundacao", parseInt(e.target.value))}
-                  className="bg-background border-input"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="descricao_hero">Descrição Hero</Label>
-              <Textarea
-                id="descricao_hero"
-                value={data.descricao_hero}
-                onChange={(e) => updateField("descricao_hero", e.target.value)}
-                placeholder="Texto principal que aparece na home do site..."
-                className="bg-background border-input"
-                rows={3}
-              />
-              <div className="flex gap-2 mt-1">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs h-7"
-                    onClick={() => updateField("descricao_hero", `Bem-vindo à ${data.nome || "Barbearia"}. Oferecemos serviços de alta qualidade em um ambiente descontraído, pensado para o homem moderno.`)}
-                  >
-                    Usar sugestão padrão
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="descricao_rodape">Descrição Rodapé</Label>
-              <Input
-                id="descricao_rodape"
-                value={data.descricao_rodape}
-                onChange={(e) => updateField("descricao_rodape", e.target.value)}
-                placeholder="Texto curto para o rodapé..."
-                className="bg-background border-input"
-              />
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="endereco">Endereço</Label>
-                <Input
-                  id="endereco"
-                  value={data.endereco}
-                  onChange={(e) => updateField("endereco", e.target.value)}
-                  placeholder="Rua, número - Bairro - Cidade/UF"
-                  className="bg-background border-input"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="telefone">Telefone da Barbearia</Label>
-                <Input
-                  id="telefone"
-                  value={data.telefone}
-                  onChange={(e) => updateField("telefone", e.target.value)}
-                  placeholder="(11) 99999-9999"
-                  className="bg-background border-input"
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="horarios">Horários de Funcionamento</Label>
-                <Input
-                  id="horarios"
-                  value={data.horarios_texto}
-                  onChange={(e) => updateField("horarios_texto", e.target.value)}
-                  placeholder="Seg-Sex: 9h-20h | Sáb: 9h-18h"
-                  className="bg-background border-input"
-                />
-                 <div className="flex flex-wrap gap-2 mt-2">
-                  {[
-                    "Seg-Sex: 09h-20h | Sáb: 09h-18h",
-                    "Seg-Sex: 10h-19h | Sáb: 09h-14h",
-                    "Ter-Sáb: 09h-20h"
-                  ].map((suggestion) => (
-                    <Button
-                      key={suggestion}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs h-7 px-2"
-                      onClick={() => updateField("horarios_texto", suggestion)}
-                    >
-                      {suggestion}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <ImageUpload
-                  label="Foto de Fundo"
-                  value={data.foto_fundo_url}
-                  onChange={(url) => updateField("foto_fundo_url", url)}
-                  onUpload={(file) => uploadFotoFundo(file, data.subdominio || "temp")}
-                  aspectRatio="video"
-                  hint="Recomendado: 1920x1080 (16:9)"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Galeria de Fotos (Opcional)</Label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {data.fotos_galeria.map((foto, index) => (
-                  <div key={index} className="relative aspect-square">
-                    <img
-                      src={foto}
-                      alt={`Galeria ${index + 1}`}
-                      className="w-full h-full object-cover rounded-lg border border-border"
+        <div className="grid lg:grid-cols-2 gap-6 items-start">
+            {/* Coluna da Esquerda: Formulário */}
+            <Card className="bg-card border-border">
+            <CardHeader>
+                <CardTitle className="text-foreground">Personalização do Site</CardTitle>
+                <CardDescription>
+                Configure a aparência e informações do site
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                    <Label htmlFor="slogan">Slogan Principal</Label>
+                    <Input
+                    id="slogan"
+                    value={data.slogan_principal}
+                    onChange={(e) => updateField("slogan_principal", e.target.value)}
+                    placeholder="Ex: Tradição e estilo desde 2010"
+                    className="bg-background border-input"
                     />
+                    <div className="flex flex-wrap gap-2 mt-2">
+                    {[
+                        "Seu estilo, nossa tradição.",
+                        "Cortes clássicos, estilo moderno.",
+                        "A melhor hora do seu dia.",
+                        "Cuidando do seu visual."
+                    ].map((suggestion) => (
+                        <Button
+                        key={suggestion}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 px-2"
+                        onClick={() => updateField("slogan_principal", suggestion)}
+                        >
+                        {suggestion}
+                        </Button>
+                    ))}
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="ano_fundacao">Ano de Fundação</Label>
+                    <Input
+                    id="ano_fundacao"
+                    type="number"
+                    value={data.ano_fundacao}
+                    onChange={(e) => updateField("ano_fundacao", parseInt(e.target.value))}
+                    className="bg-background border-input"
+                    />
+                </div>
+                </div>
+                <div className="space-y-2">
+                <Label htmlFor="descricao_hero">Descrição Hero</Label>
+                <Textarea
+                    id="descricao_hero"
+                    value={data.descricao_hero}
+                    onChange={(e) => updateField("descricao_hero", e.target.value)}
+                    placeholder="Texto principal que aparece na home do site..."
+                    className="bg-background border-input"
+                    rows={3}
+                />
+                <div className="flex gap-2 mt-1">
                     <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 size-6"
-                      onClick={() => {
-                        const newGaleria = [...data.fotos_galeria]
-                        newGaleria.splice(index, 1)
-                        updateField("fotos_galeria", newGaleria)
-                      }}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7"
+                        onClick={() => updateField("descricao_hero", `Bem-vindo à ${data.nome || "Barbearia"}. Oferecemos serviços de alta qualidade em um ambiente descontraído, pensado para o homem moderno.`)}
                     >
-                      <Trash2 className="size-3" />
+                        Usar sugestão padrão
                     </Button>
-                  </div>
-                ))}
-                {data.fotos_galeria.length < 6 && (
-                  <ImageUpload
-                    value=""
-                    onChange={(url) => {
-                      if (url) updateField("fotos_galeria", [...data.fotos_galeria, url])
-                    }}
-                    onUpload={(file) => uploadFotoGaleria(file, data.subdominio || "temp", data.fotos_galeria.length)}
-                    aspectRatio="square"
-                    hint="Adicionar foto"
-                    className="h-full"
-                  />
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Adicione até 6 fotos para mostrar o ambiente e serviços ({data.fotos_galeria.length}/6)
-              </p>
+                </div>
+                </div>
+                <div className="space-y-2">
+                <Label htmlFor="descricao_rodape">Descrição Rodapé</Label>
+                <Input
+                    id="descricao_rodape"
+                    value={data.descricao_rodape}
+                    onChange={(e) => updateField("descricao_rodape", e.target.value)}
+                    placeholder="Texto curto para o rodapé..."
+                    className="bg-background border-input"
+                />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                    <Label htmlFor="endereco">Endereço</Label>
+                    <Input
+                    id="endereco"
+                    value={data.endereco}
+                    onChange={(e) => updateField("endereco", e.target.value)}
+                    placeholder="Rua, número - Bairro - Cidade/UF"
+                    className="bg-background border-input"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="telefone">Telefone da Barbearia</Label>
+                    <Input
+                    id="telefone"
+                    value={data.telefone}
+                    onChange={(e) => updateField("telefone", e.target.value)}
+                    placeholder="(11) 99999-9999"
+                    className="bg-background border-input"
+                    />
+                </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                    <Label htmlFor="horarios">Horários de Funcionamento</Label>
+                    <Input
+                    id="horarios"
+                    value={data.horarios_texto}
+                    onChange={(e) => updateField("horarios_texto", e.target.value)}
+                    placeholder="Seg-Sex: 9h-20h | Sáb: 9h-18h"
+                    className="bg-background border-input"
+                    />
+                    <div className="flex flex-wrap gap-2 mt-2">
+                    {[
+                        "Seg-Sex: 09h-20h | Sáb: 09h-18h",
+                        "Seg-Sex: 10h-19h | Sáb: 09h-14h",
+                        "Ter-Sáb: 09h-20h"
+                    ].map((suggestion) => (
+                        <Button
+                        key={suggestion}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 px-2"
+                        onClick={() => updateField("horarios_texto", suggestion)}
+                        >
+                        {suggestion}
+                        </Button>
+                    ))}
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <ImageUpload
+                    label="Foto de Fundo"
+                    value={data.foto_fundo_url}
+                    onChange={(url) => updateField("foto_fundo_url", url)}
+                    onUpload={(file) => uploadFotoFundo(file, data.subdominio || "temp")}
+                    aspectRatio="video"
+                    hint="Recomendado: 1920x1080 (16:9)"
+                    />
+                </div>
+                </div>
+
+                <div className="space-y-2">
+                <Label>Galeria de Fotos (Opcional)</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {data.fotos_galeria.map((foto, index) => (
+                    <div key={index} className="relative aspect-square">
+                        <img
+                        src={foto}
+                        alt={`Galeria ${index + 1}`}
+                        className="w-full h-full object-cover rounded-lg border border-border"
+                        />
+                        <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 size-6"
+                        onClick={() => {
+                            const newGaleria = [...data.fotos_galeria]
+                            newGaleria.splice(index, 1)
+                            updateField("fotos_galeria", newGaleria)
+                        }}
+                        >
+                        <Trash2 className="size-3" />
+                        </Button>
+                    </div>
+                    ))}
+                    {data.fotos_galeria.length < 6 && (
+                    <ImageUpload
+                        value=""
+                        onChange={(url) => {
+                        if (url) updateField("fotos_galeria", [...data.fotos_galeria, url])
+                        }}
+                        onUpload={(file) => uploadFotoGaleria(file, data.subdominio || "temp", data.fotos_galeria.length)}
+                        aspectRatio="square"
+                        hint="Adicionar foto"
+                        className="h-full"
+                    />
+                    )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    Adicione até 6 fotos para mostrar o ambiente e serviços ({data.fotos_galeria.length}/6)
+                </p>
+                </div>
+            </CardContent>
+            </Card>
+
+            {/* Coluna da Direita: Live Preview (Fixo) */}
+            <div className="hidden lg:block sticky top-6">
+                 <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium text-muted-foreground">Pré-visualização do Site</h3>
+                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full font-medium">Ao Vivo</span>
+                    </div>
+                    <div className="rounded-xl overflow-hidden border border-border bg-card shadow-sm">
+                        <LivePreviewMockup 
+                            nome={data.nome}
+                            slogan={data.slogan_principal}
+                            fotoFundo={data.foto_fundo_url}
+                            endereco={data.endereco}
+                            telefone={data.telefone}
+                            horarios={data.horarios_texto}
+                            descricaoHero={data.descricao_hero}
+                        />
+                    </div>
+                 </div>
             </div>
-          </CardContent>
-        </Card>
+        </div>
       )}
 
       {/* Step 3: Barbeiros */}
