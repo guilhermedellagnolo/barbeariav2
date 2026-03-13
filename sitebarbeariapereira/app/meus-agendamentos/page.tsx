@@ -23,24 +23,18 @@ export default async function MeusAgendamentos() {
     .single()
 
   if (!cliente) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <h1 className="text-2xl font-bold mb-4">Perfil não encontrado</h1>
-        <p className="text-muted-foreground mb-6">Não encontramos um perfil de cliente associado à sua conta.</p>
-        <form action="/auth/signout" method="post">
-           <Button variant="outline">Sair e tentar outra conta</Button>
-        </form>
-      </div>
-    )
+    // Se o cliente nao existe, redireciona para onboarding em vez de mostrar erro
+    redirect('/onboarding')
   }
 
   // 2. Get Appointments
-  // Try to fetch barber info if possible. If fails, we might need to adjust.
-  // Assuming 'barbeiros' relation exists on 'barbeiro_id' FK.
+  // Simplified query first to ensure data loads
   const { data: agendamentos, error } = await supabase
     .from('agendamentos')
     .select(`
-      *,
+      id,
+      data_hora,
+      status,
       barbeiros (
         nome
       )
@@ -50,7 +44,6 @@ export default async function MeusAgendamentos() {
 
   if (error) {
     console.error("Error fetching appointments:", error)
-    // Fallback if relation fails or other error
   }
 
   return (

@@ -90,6 +90,11 @@ export function CancelButton({ agendamentoId, dataHora }: CancelButtonProps) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancelar agendamento?</AlertDialogTitle>
+            <div className="sr-only">
+               <AlertDialogDescription>
+                 Confirme se deseja cancelar o agendamento. Esta ação é irreversível.
+               </AlertDialogDescription>
+            </div>
             <AlertDialogDescription>
               Esta acao nao pode ser desfeita. O horario sera liberado para outros clientes.
               Lembre-se: cancelamentos so sao permitidos com ate 2 horas de antecedencia.
