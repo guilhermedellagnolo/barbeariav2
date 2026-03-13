@@ -182,25 +182,6 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
     init()
   }, [])
 
-  if (isPageLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background space-y-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground animate-pulse">Carregando barbearia...</p>
-      </div>
-    )
-  }
-
-  if (pageError) {
-    return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-background space-y-4 p-4 text-center">
-          <p className="text-destructive font-semibold">Ocorreu um erro.</p>
-          <p className="text-muted-foreground">{pageError}</p>
-          <p className="text-sm text-muted-foreground">Tente recarregar a página.</p>
-        </div>
-      )
-  }
-
   // ── Carrega serviços quando barbeiro é selecionado ────────────────────────
   useEffect(() => {
     if (!selectedBarber) return
@@ -268,6 +249,25 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
       clearInterval(pollingInterval)
     }
   }, [selectedBarber, selectedService, selectedDay])
+
+  if (isPageLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground animate-pulse">Carregando barbearia...</p>
+      </div>
+    )
+  }
+
+  if (pageError) {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background space-y-4 p-4 text-center">
+          <p className="text-destructive font-semibold">Ocorreu um erro.</p>
+          <p className="text-muted-foreground">{pageError}</p>
+          <p className="text-sm text-muted-foreground">Tente recarregar a página.</p>
+        </div>
+      )
+  }
 
   const scrollToSchedule = () => {
     scheduleSectionRef.current?.scrollIntoView({ behavior: "smooth" })
