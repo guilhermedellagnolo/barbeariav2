@@ -35,23 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: `${nome} | ${slogan}`,
     description: `Agende seu corte de cabelo na ${nome}. Atendimento premium.`,
     generator: 'v0.app',
-    icons: {
-      icon: [
-        {
-          url: '/icon-light-32x32.png',
-          media: '(prefers-color-scheme: light)',
-        },
-        {
-          url: '/icon-dark-32x32.png',
-          media: '(prefers-color-scheme: dark)',
-        },
-        {
-          url: '/icon.svg',
-          type: 'image/svg+xml',
-        },
-      ],
-      apple: '/apple-icon.png',
-    },
+    // icons removidos para usar icon.tsx gerado dinamicamente
   }
 }
 
@@ -64,7 +48,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="font-sans antialiased">
         {children}
-        <Analytics />
+        {/* <Analytics /> */}
       </body>
     </html>
   )

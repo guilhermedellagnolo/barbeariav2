@@ -99,6 +99,14 @@ const formatDateForApi = (date: Date) => {
   return `${year}-${month}-${day}`
 }
 
+// Helper para corrigir URL do Instagram (remove duplicatas de protocolo/dominio)
+const fixInstagramUrl = (url?: string) => {
+  if (!url) return ''
+  // Se a URL contiver duplicidade do prefixo, substitui por um único
+  // Ex: https://www.instagram.com/https://www.instagram.com/user -> https://www.instagram.com/user
+  return url.replace(/(https?:\/\/(www\.)?instagram\.com\/){2,}/g, 'https://www.instagram.com/')
+}
+
 // Formata preco em BRL
 const formatPrice = (price?: number | null) => {
   if (price == null) return null
@@ -835,7 +843,7 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
               <div className="flex gap-4 mt-6">
                 {barbearia?.instagram_url && (
                   <a 
-                    href={barbearia.instagram_url} 
+                    href={fixInstagramUrl(barbearia.instagram_url)} 
                     target="_blank" 
                     rel="noopener noreferrer" 
                     className="text-muted-foreground hover:text-primary transition-colors"
