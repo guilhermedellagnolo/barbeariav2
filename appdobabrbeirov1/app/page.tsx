@@ -1,5 +1,6 @@
 "use client"
 
+import { createClient } from "@supabase/supabase-js"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
@@ -154,28 +155,34 @@ export default function BarberApp() {
 
   // Redirect to login if not authenticated with Safety Timeout
   useEffect(() => {
-    // 1. Redirecionamento normal
+    // 1. Se NÃO estiver carregando E NÃO tiver usuário, manda pro login
     if (!authLoading && !user) {
       router.push("/login")
+      return
     }
 
-    // 2. Safety Timeout: Se travar no loading por 8s, força logout/login
+    // 2. Safety Timeout: Se travar no loading por 5s, força recarregamento da página (não logout)
+    // Isso é melhor que logout forçado pois pode ser apenas instabilidade de rede
     const safetyTimeout = setTimeout(() => {
         if (authLoading) {
-            console.warn("Auth loading timed out. Forcing logout.")
-            signOut()
-            router.push("/login")
+            console.warn("Auth loading timed out. Reloading page...")
+            window.location.reload()
         }
-    }, 8000)
+    }, 5000)
 
     return () => clearTimeout(safetyTimeout)
-  }, [authLoading, user, router, signOut])
+  }, [authLoading, user, router])
 
   // Realtime Updates (Notificações)
   useEffect(() => {
     if (!barbeiro) return
 
-    const supabase = createClient()
+    // Cria cliente Supabase localmente apenas para o listener (usando variáveis públicas)
+    const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    
     const channel = supabase
       .channel('realtime-appointments')
       .on(
@@ -188,15 +195,14 @@ export default function BarberApp() {
         },
         (payload) => {
           console.log('Realtime update:', payload)
-          // Toca um som de notificação (opcional, precisa de interação do usuário antes)
-          // const audio = new Audio('/notification.mp3')
-          // audio.play().catch(e => console.log('Audio play blocked'))
-
-          // Atualiza a lista
+          
+          // Atualiza a lista imediatamente
           fetchAppointments()
           
           if (payload.eventType === 'INSERT') {
-             alert('🔔 Novo agendamento recebido!')
+             // Feedback visual sutil (toast nativo ou custom)
+             // Aqui apenas logamos ou poderíamos setar um estado de "Novo!"
+             console.log("Novo agendamento recebido!")
           }
         }
       )
