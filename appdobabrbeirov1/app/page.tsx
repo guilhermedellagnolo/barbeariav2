@@ -176,6 +176,7 @@ export default function BarberApp() {
   const [clients, setClients] = useState<Client[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [completedCuts, setCompletedCuts] = useState<CompletedCut[]>([])
+  const [financeMetrics, setFinanceMetrics] = useState({ weekTotal: 0, monthTotal: 0 })
   
   useEffect(() => {
     if (!barbeiro) return
@@ -188,6 +189,9 @@ export default function BarberApp() {
     try {
       const data = await appointmentService.fetchFinanceHistory()
       setCompletedCuts(data)
+      
+      const metrics = await appointmentService.fetchFinanceMetrics()
+      setFinanceMetrics(metrics)
     } catch (error) {
       console.error("Erro ao carregar histórico financeiro:", error)
     }
@@ -1164,7 +1168,9 @@ export default function BarberApp() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xl font-bold text-foreground">R$ 680,00</p>
+                  <p className="text-xl font-bold text-foreground">
+                    R$ {financeMetrics.weekTotal.toFixed(2).replace('.', ',')}
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -1175,7 +1181,9 @@ export default function BarberApp() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xl font-bold text-foreground">R$ 2.450,00</p>
+                  <p className="text-xl font-bold text-foreground">
+                    R$ {financeMetrics.monthTotal.toFixed(2).replace('.', ',')}
+                  </p>
                 </CardContent>
               </Card>
             </div>

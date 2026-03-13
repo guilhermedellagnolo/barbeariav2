@@ -266,6 +266,61 @@ export const fetchFinanceHistory = async (): Promise<CompletedCut[]> => {
     }
 }
 
+export const fetchFinanceMetrics = async (): Promise<{ weekTotal: number; monthTotal: number }> => {
+    try {
+        const now = new Date()
+        
+        // Start of Month
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        startOfMonth.setHours(0, 0, 0, 0)
+        
+        // Start of Week (Sunday)
+        const startOfWeek = new Date(now)
+        startOfWeek.setDate(now.getDate() - now.getDay())
+        startOfWeek.setHours(0, 0, 0, 0)
+
+        // Min Date to fetch (earliest of the two)
+        const minDate = startOfMonth < startOfWeek ? startOfMonth : startOfWeek
+        
+        // Convert to ISO string for Supabase comparison
+        // Note: Supabase timestamptz comparison works well with ISO strings
+        const minDateIso = minDate.toISOString()
+
+        const { data, error } = await supabase
+            .from('agendamentos')
+            .select('data_hora, servicos(preco)')
+            .eq('barbearia_id', getBarbeariaId())
+            .eq('barbeiro_id', getBarbeiroId())
+            .eq('status', 'concluido')
+            .gte('data_hora', minDateIso)
+        
+        if (error) throw error
+        
+        let weekTotal = 0
+        let monthTotal = 0
+        
+        if (data) {
+            data.forEach((apt: any) => {
+                const aptDate = new Date(apt.data_hora)
+                const price = apt.servicos?.preco || 0
+                
+                // Compare timestamps
+                if (aptDate.getTime() >= startOfWeek.getTime()) {
+                    weekTotal += price
+                }
+                if (aptDate.getTime() >= startOfMonth.getTime()) {
+                    monthTotal += price
+                }
+            })
+        }
+        
+        return { weekTotal, monthTotal }
+    } catch (error) {
+        console.error("Erro ao carregar métricas financeiras:", error)
+        return { weekTotal: 0, monthTotal: 0 }
+    }
+}
+
 export const fetchAppointments = async (dateString: string): Promise<any[]> => {
     try {
         const { data, error } = await supabase
