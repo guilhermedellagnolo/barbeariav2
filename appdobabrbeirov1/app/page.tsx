@@ -152,12 +152,60 @@ export default function BarberApp() {
   const router = useRouter()
   const { user, barbeiro, loading: authLoading, signOut, error: authError } = useAuth()
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated with Safety Timeout
   useEffect(() => {
+    // 1. Redirecionamento normal
     if (!authLoading && !user) {
       router.push("/login")
     }
-  }, [authLoading, user, router])
+
+    // 2. Safety Timeout: Se travar no loading por 8s, força logout/login
+    const safetyTimeout = setTimeout(() => {
+        if (authLoading) {
+            console.warn("Auth loading timed out. Forcing logout.")
+            signOut()
+            router.push("/login")
+        }
+    }, 8000)
+
+    return () => clearTimeout(safetyTimeout)
+  }, [authLoading, user, router, signOut])
+
+  // Realtime Updates (Notificações)
+  useEffect(() => {
+    if (!barbeiro) return
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel('realtime-appointments')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escuta INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'agendamentos',
+          filter: `barbeiro_id=eq.${barbeiro.id}`,
+        },
+        (payload) => {
+          console.log('Realtime update:', payload)
+          // Toca um som de notificação (opcional, precisa de interação do usuário antes)
+          // const audio = new Audio('/notification.mp3')
+          // audio.play().catch(e => console.log('Audio play blocked'))
+
+          // Atualiza a lista
+          fetchAppointments()
+          
+          if (payload.eventType === 'INSERT') {
+             alert('🔔 Novo agendamento recebido!')
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [barbeiro])
 
   // Settings State
   const [activeTab, setActiveTab] = useState<TabType>("radar")
