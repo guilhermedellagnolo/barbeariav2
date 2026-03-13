@@ -2,15 +2,25 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  // Ignorar arquivos estáticos e imagens explicitamente
+  // 1. Definição de rotas públicas e estáticas que NUNCA devem ser bloqueadas
+  const path = request.nextUrl.pathname
+  
+  // Arquivos estáticos do Next.js, imagens, favicon, etc.
   if (
-    request.nextUrl.pathname.startsWith('/_next') ||
-    request.nextUrl.pathname.startsWith('/static') ||
-    request.nextUrl.pathname.includes('.') // Arquivos com extensão (css, js, png, ico)
+    path.startsWith('/_next') || 
+    path.startsWith('/static') || 
+    path.includes('.') || // Arquivos com extensão (js, css, png, etc)
+    path === '/favicon.ico'
   ) {
     return NextResponse.next()
   }
 
+  // Rotas públicas de autenticação
+  if (path.startsWith('/login') || path.startsWith('/auth')) {
+    return NextResponse.next()
+  }
+
+  // 2. Configuração do Cliente Supabase
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -63,34 +73,41 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // 1. Verifica se existe sessão ativa
+  // 3. Verificação de Sessão
+  // getUser é mais seguro que getSession para middleware
   const { data: { user } } = await supabase.auth.getUser()
 
-  // 2. Proteção de Rota
-  // Se NÃO estiver logado e NÃO for a página de login -> Manda pro Login
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // Se NÃO estiver logado -> Redireciona para Login
+  if (!user) {
+    const loginUrl = new URL('/login', request.url)
+    // Evita loop de redirecionamento se já estiver indo pro login (embora o check acima já resolva)
+    return NextResponse.redirect(loginUrl)
   }
 
-  // 3. Se ESTIVER logado e tentar acessar login -> Manda pra Home
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-
-  // 4. VERIFICAÇÃO DE EMAIL (Hardcoded Security)
-  // Se estiver logado, mas o email não for o seu -> Bloqueia
+  // 4. Verificação de E-mail (Segurança Hardcoded)
   const ALLOWED_EMAIL = 't3barber@gmail.com'
-  if (user && user.email !== ALLOWED_EMAIL) {
-    // Retorna erro 403 Forbidden
-    return new NextResponse(
-      JSON.stringify({ error: 'Acesso negado. Usuário não autorizado.' }),
-      { status: 403, headers: { 'content-type': 'application/json' } }
-    )
+  
+  if (user.email !== ALLOWED_EMAIL) {
+    // Se for uma requisição de API, retorna JSON
+    if (path.startsWith('/api')) {
+       return new NextResponse(
+        JSON.stringify({ error: 'Acesso negado. Usuário não autorizado.' }),
+        { status: 403, headers: { 'content-type': 'application/json' } }
+      )
+    }
+    
+    // Se for página, faz logout e manda pro login com erro
+    await supabase.auth.signOut()
+    const url = new URL('/login', request.url)
+    url.searchParams.set('error', 'unauthorized')
+    return NextResponse.redirect(url)
   }
 
   return response
 }
 
+// Configuração do Matcher para ser o mais abrangente possível, 
+// deixando a lógica de exclusão para o código (mais seguro e previsível)
 export const config = {
   matcher: [
     /*
