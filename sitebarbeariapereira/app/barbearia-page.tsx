@@ -399,8 +399,8 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
   const descricaoHero = barbearia?.descricao_hero || 'Experiência premium em barbearia. Atendimento personalizado com técnicas clássicas e modernas.'
   const galleryImages = barbearia?.fotos_galeria?.length ? barbearia.fotos_galeria : FALLBACK_GALLERY
   const descricaoRodape = barbearia?.descricao_rodape || 'Tradição e qualidade em cortes masculinos desde 2010. Sua experiência premium em barbearia.'
-  const enderecoBarbearia = barbearia?.endereco || 'Rua das Palmeiras, 123 - Centro, São Paulo - SP'
-  const telefoneBarbearia = barbearia?.telefone || '(11) 99999-9999'
+  const enderecoBarbearia = barbearia?.endereco || 'R. Pedro Manoel Duque - Ulysses Guimarães, Joinville - SC, 89230-490'
+  const telefoneBarbearia = barbearia?.telefone || '(47) 99142-2984'
   const horariosTexto = barbearia?.horarios_texto || 'Segunda a Sexta: 08:00 - 19:00\nSábado: 08:00 - 17:00\nDomingo: Fechado'
 
   return (
@@ -823,7 +823,7 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
               <h4 className="text-lg font-semibold text-foreground mb-4">Contato</h4>
               <div className="space-y-3">
                 <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoBarbearia)}`}
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nomeBarbearia + " " + enderecoBarbearia)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 text-muted-foreground hover:text-primary transition-colors"
@@ -833,9 +833,11 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
                   <span>{enderecoBarbearia}</span>
                 </a>
                 <a 
-                  href={`tel:${telefoneBarbearia.replace(/\D/g, '')}`}
+                  href={`https://wa.me/55${telefoneBarbearia.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center gap-3 text-muted-foreground hover:text-primary transition-colors"
-                  title="Ligar para barbearia"
+                  title="Entrar em contato via WhatsApp"
                 >
                   <Phone className="h-5 w-5 text-primary flex-shrink-0" />
                   <span>{telefoneBarbearia}</span>
