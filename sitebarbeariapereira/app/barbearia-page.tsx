@@ -180,8 +180,10 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
     // Aguarda o serviço ser selecionado antes de gerar slots
     if (!selectedBarber || !selectedService) return
 
+    let isMounted = true
+
     async function fetchSlots(silent = false) {
-      if (!selectedBarber || !selectedService) return
+      if (!selectedBarber || !selectedService || !isMounted) return
 
       // Na carga inicial exibe o spinner; no polling silencioso nao pisca a UI
       if (!silent) setLoadingSlots(true)
@@ -196,19 +198,21 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
           getAppointments(dateStr, barbeariaId, selectedBarber.id)
         ])
 
-        if (workingHours) {
-          // Passa DUAS durações distintas:
-          //   slotDuration (workingHours) = intervalo da grade
-          //   selectedService.duracao_minutos = duração real do serviço (para "cabe antes do fechamento")
-          setSlots(generateAvailableSlots(dateStr, workingHours, appointments, selectedService.duracao_minutos))
-        } else {
-          setSlots([])
+        if (isMounted) {
+          if (workingHours) {
+            // Passa DUAS durações distintas:
+            //   slotDuration (workingHours) = intervalo da grade
+            //   selectedService.duracao_minutos = duração real do serviço (para "cabe antes do fechamento")
+            setSlots(generateAvailableSlots(dateStr, workingHours, appointments, selectedService.duracao_minutos))
+          } else {
+            setSlots([])
+          }
         }
       } catch (error) {
         console.error("Error fetching slots:", error)
-        if (!silent) setSlots([])
+        if (isMounted && !silent) setSlots([])
       } finally {
-        if (!silent) setLoadingSlots(false)
+        if (isMounted && !silent) setLoadingSlots(false)
       }
     }
 
@@ -219,7 +223,10 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
     const pollingInterval = setInterval(() => fetchSlots(true), 60_000)
 
     // Cleanup: cancela o intervalo quando o servico, barbeiro ou dia muda, ou o componente desmonta
-    return () => clearInterval(pollingInterval)
+    return () => {
+      isMounted = false
+      clearInterval(pollingInterval)
+    }
   }, [selectedBarber, selectedService, selectedDay])
 
   const scrollToSchedule = () => {
