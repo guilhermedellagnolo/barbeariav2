@@ -26,6 +26,17 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { ImageUpload } from "@/components/image-upload"
 import { uploadFotoFundo, uploadFotoBarbeiro, uploadFotoGaleria } from "@/services/uploadService"
 import type { Barbearia, Barbeiro, Plano, StatusPagamento } from "@/lib/types"
@@ -34,10 +45,11 @@ interface BarbeariaDetailsProps {
   barbearia: Barbearia
   onBack: () => void
   onSave: (barbearia: Barbearia) => void
+  onDelete?: (id: string) => void
   saving?: boolean
 }
 
-export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, saving }: BarbeariaDetailsProps) {
+export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, onDelete, saving }: BarbeariaDetailsProps) {
   const [barbearia, setBarbearia] = useState<Barbearia>(initialBarbearia)
   const [newBarbeiro, setNewBarbeiro] = useState({ nome: "", foto_url: "", email: "", senha: "" })
   const [galeriaInput, setGaleriaInput] = useState("")
@@ -334,7 +346,37 @@ export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, 
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center mt-8 pt-8 border-t border-border">
+            {onDelete && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={saving} className="gap-2">
+                    <Trash2 className="size-4" />
+                    Excluir Barbearia
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação não pode ser desfeita. Isso excluirá permanentemente a barbearia
+                      <strong> {barbearia.nome}</strong> e todos os seus dados, incluindo barbeiros,
+                      agendamentos e clientes.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => onDelete(barbearia.id)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Sim, excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
             <Button onClick={handleSave} disabled={saving} className="gap-2">
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
               {saving ? "Salvando..." : "Salvar Alterações"}

@@ -9,6 +9,7 @@ import {
   updateBarbearia,
   createBarbearia,
   toggleAtivo,
+  deleteBarbearia,
 } from "@/services/barbeariaService"
 import type { Barbearia, NovaBarbearia } from "@/lib/types"
 import { Scissors, Loader2, AlertCircle, RefreshCw } from "lucide-react"
@@ -102,6 +103,19 @@ export default function Dashboard() {
     }
   }
 
+  const handleDeleteBarbearia = async (id: string) => {
+    try {
+      setSaving(true)
+      await deleteBarbearia(id)
+      await loadBarbearias()
+      handleBack()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao excluir barbearia")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
@@ -176,6 +190,7 @@ export default function Dashboard() {
                 barbearia={selectedBarbearia}
                 onBack={handleBack}
                 onSave={handleSaveBarbearia}
+                onDelete={handleDeleteBarbearia}
                 saving={saving}
               />
             )}

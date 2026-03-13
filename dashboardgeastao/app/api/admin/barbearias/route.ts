@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAdminClient } from "@/lib/supabase-admin"
 
+export const dynamic = 'force-dynamic'
+
 // ─── POST: Criar Barbearia completa (barbearia + barbeiros + horários + auth) ──
 export async function POST(request: NextRequest) {
   const supabase = getAdminClient()
@@ -216,6 +218,47 @@ export async function POST(request: NextRequest) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
+      return NextResponse.json({ success: true })
+    }
+
+    // ── ACTION: delete ─────────────────────────────────────────────────────
+    if (action === "delete") {
+      const { id } = data
+      
+      // 1. Buscar barbeiros para deletar usuários do Auth
+      const { data: barbeiros } = await supabase
+        .from("barbeiros")
+        .select("usuario_id")
+        .eq("barbearia_id", id)
+      
+      // 2. Deletar barbearia (Cascade deve deletar barbeiros, agendamentos, clientes, etc)
+      // Se não tiver cascade configurado no banco, precisaria deletar manualmente.
+      // Assumindo que o usuário quer forçar a limpeza:
+      
+      // Deletar dependências manualmente para garantir
+      await supabase.from("agendamentos").delete().eq("barbearia_id", id)
+      await supabase.from("clientes").delete().eq("barbearia_id", id)
+      await supabase.from("servicos").delete().eq("barbearia_id", id)
+      await supabase.from("barbeiros").delete().eq("barbearia_id", id)
+
+      const { error } = await supabase
+        .from("barbearias")
+        .delete()
+        .eq("id", id)
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      // 3. Deletar usuários do Auth (best effort)
+      if (barbeiros?.length) {
+        for (const b of barbeiros) {
+          if (b.usuario_id) {
+            await supabase.auth.admin.deleteUser(b.usuario_id)
+          }
+        }
+      }
+
       return NextResponse.json({ success: true })
     }
 

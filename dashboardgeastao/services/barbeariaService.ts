@@ -139,3 +139,21 @@ export async function toggleAtivo(id: string, ativo: boolean): Promise<void> {
     throw new Error(error.error || "Erro ao alterar status")
   }
 }
+
+// ─── Delete (via API Route) ───────────────────────────────────────────────────
+
+export async function deleteBarbearia(id: string): Promise<void> {
+  const res = await fetch("/api/admin/barbearias", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ 
+      action: "delete", 
+      data: { id } 
+    }),
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    throw new Error(error.error || "Erro ao deletar barbearia")
+  }
+}
