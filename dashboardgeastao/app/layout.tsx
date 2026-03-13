@@ -7,7 +7,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'BarberSaaS - Painel Administrativo',
+  title: 'T3Barber - Gestão',
   description: 'Dashboard administrativo para gerenciamento de barbearias',
   generator: 'v0.app',
   icons: {

@@ -14,6 +14,41 @@ interface BarberAccount {
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Verificação de Segurança da Sessão
+    // Precisamos validar se quem está chamando essa rota é o admin autorizado
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader) {
+        // Se não tiver header, tenta pegar o cookie via Supabase (caso seja chamado pelo client-side)
+        // Como esta é uma rota de API Handler, o middleware já deve ter barrado acessos externos,
+        // mas é boa prática ter defesa em profundidade.
+    }
+
+    // Nota: Como estamos em um ambiente server-side sem acesso fácil aos cookies do middleware aqui dentro 
+    // (a menos que usemos createServerClient), e o middleware JÁ BLOQUEIA acessos não autorizados a /api/* 
+    // (se configurado no matcher), vamos confiar no middleware para autenticação básica.
+    // Mas para blindagem total, vamos verificar se o body tem um "secret" ou se o usuário está logado.
+    
+    // Melhor abordagem: Usar o cliente anonimo para verificar a sessao do usuario que fez o request
+    const supabaseAuth = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    
+    // Pega o token do header
+    const token = authHeader?.replace('Bearer ', '')
+    let user = null
+    
+    if (token) {
+        const { data } = await supabaseAuth.auth.getUser(token)
+        user = data.user
+    }
+
+    // Hardcoded Security Check
+    const ALLOWED_EMAIL = 'guilherme.delagnolo@gmail.com'
+    if (!user || user.email !== ALLOWED_EMAIL) {
+        return NextResponse.json({ error: "Acesso não autorizado." }, { status: 403 })
+    }
+
     const { barbers } = (await request.json()) as { barbers: BarberAccount[] }
 
     if (!barbers || barbers.length === 0) {
