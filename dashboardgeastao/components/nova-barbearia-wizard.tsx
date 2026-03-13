@@ -305,6 +305,24 @@ export function NovaBarbeariaWizard({ onBack, onCreate, saving }: NovaBarbeariaW
                   placeholder="Ex: Tradição e estilo desde 2010"
                   className="bg-background border-input"
                 />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {[
+                    "Seu estilo, nossa tradição.",
+                    "Cortes clássicos, estilo moderno.",
+                    "A melhor hora do seu dia.",
+                    "Cuidando do seu visual."
+                  ].map((suggestion) => (
+                    <Button
+                      key={suggestion}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 px-2"
+                      onClick={() => updateField("slogan_principal", suggestion)}
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ano_fundacao">Ano de Fundação</Label>
@@ -327,6 +345,16 @@ export function NovaBarbeariaWizard({ onBack, onCreate, saving }: NovaBarbeariaW
                 className="bg-background border-input"
                 rows={3}
               />
+              <div className="flex gap-2 mt-1">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => updateField("descricao_hero", `Bem-vindo à ${data.nome || "Barbearia"}. Oferecemos serviços de alta qualidade em um ambiente descontraído, pensado para o homem moderno.`)}
+                  >
+                    Usar sugestão padrão
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="descricao_rodape">Descrição Rodapé</Label>
@@ -370,6 +398,23 @@ export function NovaBarbeariaWizard({ onBack, onCreate, saving }: NovaBarbeariaW
                   placeholder="Seg-Sex: 9h-20h | Sáb: 9h-18h"
                   className="bg-background border-input"
                 />
+                 <div className="flex flex-wrap gap-2 mt-2">
+                  {[
+                    "Seg-Sex: 09h-20h | Sáb: 09h-18h",
+                    "Seg-Sex: 10h-19h | Sáb: 09h-14h",
+                    "Ter-Sáb: 09h-20h"
+                  ].map((suggestion) => (
+                    <Button
+                      key={suggestion}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 px-2"
+                      onClick={() => updateField("horarios_texto", suggestion)}
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <ImageUpload
