@@ -132,36 +132,52 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
   const days = getNextDays()
 
   // ── Init: usuário + barbeiro ───────────────────────────────────────────────
+  const [isPageLoading, setIsPageLoading] = useState(true)
+
   useEffect(() => {
     async function init() {
-      // Fetch User
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+      try {
+        setIsPageLoading(true)
+        // Fetch User
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
 
-      if (user) {
-        // Usa maybeSingle() para evitar erro 406/PGRST116 quando não existe
-        const { data } = await supabase.from('clientes').select('*').eq('user_id', user.id).maybeSingle()
-        if (data) {
-          setClientRecord(data)
-          setFormData({ name: data.nome || "", whatsapp: data.telefone || "" })
+        if (user) {
+          // Usa maybeSingle() para evitar erro 406/PGRST116 quando não existe
+          const { data } = await supabase.from('clientes').select('*').eq('user_id', user.id).maybeSingle()
+          if (data) {
+            setClientRecord(data)
+            setFormData({ name: data.nome || "", whatsapp: data.telefone || "" })
+          }
         }
+
+        // Fetch Barbearia (dados dinâmicos do tenant)
+        const barbeariaData = await getBarbearia(barbeariaId)
+        if (barbeariaData) setBarbearia(barbeariaData)
+
+        // Fetch all barbers
+        const allBarbers = await getAllBarbers(barbeariaId)
+        setBarbers(allBarbers.map(b => ({
+          ...b,
+          role: "Barbeiro Especialista",
+          image: b.foto_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face"
+        })))
+      } finally {
+        setIsPageLoading(false)
       }
-
-      // Fetch Barbearia (dados dinâmicos do tenant)
-      const barbeariaData = await getBarbearia(barbeariaId)
-      if (barbeariaData) setBarbearia(barbeariaData)
-
-      // Fetch all barbers
-      const allBarbers = await getAllBarbers(barbeariaId)
-      setBarbers(allBarbers.map(b => ({
-        ...b,
-        role: "Barbeiro Especialista",
-        image: b.foto_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face"
-      })))
     }
     init()
   }, [])
+
+  if (isPageLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground animate-pulse">Carregando barbearia...</p>
+      </div>
+    )
+  }
 
   // ── Carrega serviços quando barbeiro é selecionado ────────────────────────
   useEffect(() => {
