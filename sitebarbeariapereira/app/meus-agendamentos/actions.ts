@@ -86,14 +86,20 @@ export async function cancelarAgendamento(agendamentoId: string) {
   }
 
   // 6. Executa o cancelamento
-  const { error: updateError } = await supabase
+  const { data: updatedData, error: updateError } = await supabase
     .from('agendamentos')
     .update({ status: 'cancelado' })
     .eq('id', agendamentoId)
+    .select()
 
   if (updateError) {
     console.error('[cancelar] Erro ao atualizar status:', updateError)
     return { error: 'Erro ao cancelar. Tente novamente.' }
+  }
+
+  if (!updatedData || updatedData.length === 0) {
+    console.error('[cancelar] Update falhou silenciosamente (provavel bloqueio RLS).')
+    return { error: 'Erro de permissao ao cancelar.' }
   }
 
   console.log('[cancelar] Agendamento cancelado com sucesso:', agendamentoId)

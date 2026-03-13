@@ -5,6 +5,7 @@ import {
   Sheet,
   SheetContent,
   SheetTitle,
+  SheetDescription, // Importado
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -242,6 +243,9 @@ export function AgendamentosSheet({ children, clienteId }: AgendamentosSheetProp
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0 gap-0">
         {/* SheetTitle obrigatorio pelo Radix UI (ARIA) */}
         <SheetTitle className="sr-only">Meus Agendamentos</SheetTitle>
+        <SheetDescription className="sr-only">
+          Lista dos seus agendamentos futuros e passados na barbearia.
+        </SheetDescription>
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
