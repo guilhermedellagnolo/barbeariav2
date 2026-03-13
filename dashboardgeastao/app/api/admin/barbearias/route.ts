@@ -178,10 +178,13 @@ export async function POST(request: NextRequest) {
         
         for (const barber of fields.barbeiros) {
           // Se for novo (id começa com "new-") e tem credenciais
-          if (barber.id.startsWith("new-") && barber.email && barber.senha) {
+          // Compatibilidade: BarbeariaDetails envia 'novaSenha', NovaBarbeariaWizard envia 'senha'
+          const password = barber.senha || barber.novaSenha
+
+          if (barber.id.startsWith("new-") && barber.email && password) {
              const { data: authData, error: authError } = await supabase.auth.admin.createUser({
               email: barber.email,
-              password: barber.senha,
+              password: password,
               email_confirm: true,
               user_metadata: { nome: barber.nome, role: "barbeiro" },
             })
