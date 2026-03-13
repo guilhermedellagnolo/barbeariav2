@@ -59,6 +59,7 @@ export interface Barbearia {
   endereco: string | null
   telefone: string | null
   horarios_texto: string | null
+  instagram_url: string | null
 }
 
 // ─── Interface para Serviços ──────────────────────────────────────────────────
@@ -75,7 +76,7 @@ export async function getBarbearia(barbeariaId: string = BARBERSHOP_ID): Promise
   const supabase = createClient()
   const { data, error } = await supabase
     .from('barbearias')
-    .select('id, nome, subdominio, dominio_customizado, ativo, foto_fundo_url, ano_fundacao, slogan_principal, descricao_hero, fotos_galeria, descricao_rodape, endereco, telefone, horarios_texto')
+    .select('id, nome, subdominio, dominio_customizado, ativo, foto_fundo_url, ano_fundacao, slogan_principal, descricao_hero, fotos_galeria, descricao_rodape, endereco, telefone, horarios_texto, instagram_url')
     .eq('id', barbeariaId)
     .single()
 

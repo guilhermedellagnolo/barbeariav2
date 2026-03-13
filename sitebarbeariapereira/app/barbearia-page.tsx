@@ -8,7 +8,6 @@ import {
   MapPin,
   Phone,
   Instagram,
-  Facebook,
   ChevronLeft,
   ChevronRight,
   X,
@@ -834,12 +833,16 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
                 ))}
               </div>
               <div className="flex gap-4 mt-6">
-                <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                  <Instagram className="h-6 w-6" />
-                </a>
-                <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                  <Facebook className="h-6 w-6" />
-                </a>
+                {barbearia?.instagram_url && (
+                  <a 
+                    href={barbearia.instagram_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <Instagram className="h-6 w-6" />
+                  </a>
+                )}
               </div>
             </div>
           </div>

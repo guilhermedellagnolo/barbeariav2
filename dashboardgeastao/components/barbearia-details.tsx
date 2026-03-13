@@ -202,6 +202,19 @@ export function BarbeariaDetails({ barbearia: initialBarbearia, onBack, onSave, 
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="instagram_url">Instagram</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground whitespace-nowrap">instagram.com/</span>
+                  <Input
+                    id="instagram_url"
+                    value={barbearia.instagram_url?.replace('https://instagram.com/', '') || ''}
+                    onChange={(e) => updateField("instagram_url", `https://instagram.com/${e.target.value.replace('https://instagram.com/', '')}`)}
+                    placeholder="usuario"
+                    className="bg-background border-input"
+                  />
+                </div>
+              </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="horarios">Horários de Funcionamento</Label>

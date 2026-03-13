@@ -25,6 +25,7 @@ export interface Barbearia {
   ano_fundacao: number
   foto_fundo_url: string
   fotos_galeria: string[]
+  instagram_url?: string
   plano: Plano
   valor_mensalidade: number
   data_vencimento: string
@@ -61,5 +62,6 @@ export interface NovaBarbearia {
   ano_fundacao: number
   foto_fundo_url: string
   fotos_galeria: string[]
+  instagram_url?: string
   barbeiros: NovoBarbeiro[]
 }
