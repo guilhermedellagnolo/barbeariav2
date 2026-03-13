@@ -133,11 +133,14 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
 
   // ── Init: usuário + barbeiro ───────────────────────────────────────────────
   const [isPageLoading, setIsPageLoading] = useState(true)
+  const [pageError, setPageError] = useState<string | null>(null)
 
   useEffect(() => {
     async function init() {
       try {
         setIsPageLoading(true)
+        setPageError(null)
+
         // Fetch User
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
@@ -154,7 +157,12 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
 
         // Fetch Barbearia (dados dinâmicos do tenant)
         const barbeariaData = await getBarbearia(barbeariaId)
-        if (barbeariaData) setBarbearia(barbeariaData)
+        if (barbeariaData) {
+            setBarbearia(barbeariaData)
+        } else {
+            // Se não encontrar barbearia, lança erro para não mostrar site vazio/padrão
+            throw new Error("Barbearia não encontrada.")
+        }
 
         // Fetch all barbers
         const allBarbers = await getAllBarbers(barbeariaId)
@@ -163,6 +171,10 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
           role: "Barbeiro Especialista",
           image: b.foto_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face"
         })))
+
+      } catch (err: any) {
+        console.error("Erro ao carregar barbearia:", err)
+        setPageError(err.message || "Erro ao carregar dados.")
       } finally {
         setIsPageLoading(false)
       }
@@ -177,6 +189,16 @@ export default function BarbeariaPage({ barbeariaId }: { barbeariaId: string }) 
         <p className="text-muted-foreground animate-pulse">Carregando barbearia...</p>
       </div>
     )
+  }
+
+  if (pageError) {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background space-y-4 p-4 text-center">
+          <p className="text-destructive font-semibold">Ocorreu um erro.</p>
+          <p className="text-muted-foreground">{pageError}</p>
+          <p className="text-sm text-muted-foreground">Tente recarregar a página.</p>
+        </div>
+      )
   }
 
   // ── Carrega serviços quando barbeiro é selecionado ────────────────────────
