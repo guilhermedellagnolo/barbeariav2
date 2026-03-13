@@ -25,15 +25,18 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("Tentando login com:", email) // DEBUG
     setLoading(true)
     setError(null)
 
     try {
       // 1. Tenta login no Supabase
+      console.log("Chamando supabase.auth.signInWithPassword...") // DEBUG
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
+      console.log("Resposta Supabase:", { data, error }) // DEBUG
 
       if (error) {
         throw new Error(error.message === 'Invalid login credentials' 
@@ -45,16 +48,19 @@ export default function LoginPage() {
       // Só permite o SEU email. Qualquer outro login válido é bloqueado aqui.
       const ALLOWED_EMAIL = 't3barber@gmail.com'
       
+      console.log("Verificando email permitido:", data.user?.email) // DEBUG
       if (data.user?.email !== ALLOWED_EMAIL) {
         await supabase.auth.signOut() // Desloga imediatamente
         throw new Error('Acesso não autorizado. Este painel é restrito.')
       }
 
       // 3. Sucesso -> Redireciona para Dashboard
+      console.log("Login sucesso! Redirecionando...") // DEBUG
       router.push('/')
       router.refresh()
       
     } catch (err: any) {
+      console.error("Erro no login:", err) // DEBUG
       setError(err.message || 'Ocorreu um erro ao entrar.')
     } finally {
       setLoading(false)

@@ -42,7 +42,6 @@ export default function RootLayout({
     <html lang="pt-BR" className="dark">
       <body className="font-sans antialiased">
         {children}
-        <Analytics />
       </body>
     </html>
   )
