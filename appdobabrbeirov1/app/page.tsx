@@ -1,9 +1,9 @@
 "use client"
 
-import { createClient } from "@supabase/supabase-js"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
+import { supabase } from "@/lib/supabase"
 import { getBarbeiroId } from "@/lib/session-store"
 import {
   Radar,
@@ -177,12 +177,7 @@ export default function BarberApp() {
   useEffect(() => {
     if (!barbeiro) return
 
-    // Cria cliente Supabase localmente apenas para o listener (usando variáveis públicas)
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-    
+    // Usa a instância singleton do Supabase (evita múltiplos WebSockets)
     const channel = supabase
       .channel('realtime-appointments')
       .on(
@@ -201,7 +196,6 @@ export default function BarberApp() {
           
           if (payload.eventType === 'INSERT') {
              // Feedback visual sutil (toast nativo ou custom)
-             // Aqui apenas logamos ou poderíamos setar um estado de "Novo!"
              console.log("Novo agendamento recebido!")
           }
         }
