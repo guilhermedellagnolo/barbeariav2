@@ -100,6 +100,7 @@ export async function cancelarAgendamento(agendamentoId: string) {
 
   // 7. Revalida a pagina para refletir o novo status sem reload manual
   revalidatePath('/meus-agendamentos')
+  revalidatePath('/') // Libera o slot na vitrine imediatamente
 
   return { success: true }
 }
