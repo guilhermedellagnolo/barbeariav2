@@ -22,7 +22,7 @@ export async function sendWhatsAppNotification({ phone, message }: SendMessagePr
   }
 
   try {
-    const response = await fetch(`${UAZAPI_URL}/message/sendText/BarbeariaPereira`, {
+    const response = await fetch(`${UAZAPI_URL}/message/sendText/barbearias`, {
       method: 'POST',
       headers: {
         'apikey': UAZAPI_TOKEN,
