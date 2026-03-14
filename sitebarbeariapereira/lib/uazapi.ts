@@ -22,24 +22,21 @@ export async function sendWhatsAppNotification({ phone, message }: SendMessagePr
   }
 
   try {
-    // Endpoint correto da Uazapi/Evolution API v1.x/v2.x
-    // Ajuste para evitar erro 405 (Method Not Allowed)
-    const response = await fetch(`${UAZAPI_URL}/message/sendText/barbearias`, {
+    // Endpoint correto descoberto via fluxo n8n: /send/text
+    // Payload simplificado: { number, text }
+    // Header: { token } em vez de { apikey } ou { Authorization }
+    
+    // O n8n usa: https://tectonny.uazapi.com/send/text
+    const response = await fetch(`${UAZAPI_URL}/send/text`, {
       method: 'POST',
       headers: {
-        'apikey': UAZAPI_TOKEN,
+        'token': UAZAPI_TOKEN, // Nome do header específico desta versão
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
         number: cleanPhone,
-        options: {
-          delay: 1000,
-          presence: "composing",
-          linkPreview: false
-        },
-        textMessage: {
-          text: message
-        }
+        text: message
       }),
     })
 

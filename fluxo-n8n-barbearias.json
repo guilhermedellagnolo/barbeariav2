@@ -1,0 +1,73 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "uazapi",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                0,
+                0
+            ],
+            "name": "Webhook",
+            "id": "8886d6dcef4a59fd",
+            "webhookId": "8886d6dcef4a59fd"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https:\/\/tectonny.uazapi.com\/send\/text",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Accept",
+                            "value": "application\/json"
+                        },
+                        {
+                            "name": "token",
+                            "value": "c26ec12d-d11e-4181-9b4c-b7b8b5506ec5"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "number",
+                            "value": "=5547996589483"
+                        },
+                        {
+                            "name": "text",
+                            "value": "=Ol\u00e1! \ud83d\udc4b  \nEsse \u00e9 um teste autom\u00e1tico da Uazapi.  \nInst\u00e2ncia: barbearias  \nEvento: {{ $json.body.EventType }}  \n\u00daltima mensagem: {{ $json.body.message.text }}  \n"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                240,
+                0
+            ],
+            "name": "Enviar Mensagem"
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar Mensagem",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
