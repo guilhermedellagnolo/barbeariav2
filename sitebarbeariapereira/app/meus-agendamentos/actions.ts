@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sendWhatsAppNotification } from '@/lib/uazapi'
 
 const CANCEL_WINDOW_HOURS = 2
 
@@ -103,6 +104,52 @@ export async function cancelarAgendamento(agendamentoId: string) {
   }
 
   console.log('[cancelar] Agendamento cancelado com sucesso:', agendamentoId)
+
+  // ─── Notificação WhatsApp (Cancelamento - Síncrono) ───────────────────────────
+  // Aguarda o envio para garantir que a mensagem saia antes do revalidatePath
+  try {
+    // 1. Busca dados básicos do agendamento (incluindo ID do barbeiro)
+    // Precisamos buscar de novo ou aproveitar o updatedData se ele trouxer tudo
+    // O updatedData traz o que foi atualizado. Vamos buscar detalhes extras.
+    const { data: details } = await supabase
+      .from('agendamentos')
+      .select('barbeiro_id, cliente_nome, data_hora')
+      .eq('id', agendamentoId)
+      .single()
+
+    if (details) {
+      // 2. Busca telefone do barbeiro
+      const { data: barberData } = await supabase
+        .from('barbeiros')
+        .select('telefone, nome')
+        .eq('id', details.barbeiro_id)
+        .single()
+
+      if (barberData?.telefone) {
+        // 3. Monta mensagem
+        const dataObj = new Date(details.data_hora)
+        const dia = String(dataObj.getDate()).padStart(2, '0')
+        const mes = String(dataObj.getMonth() + 1).padStart(2, '0')
+        const hora = String(dataObj.getHours()).padStart(2, '0')
+        const min = String(dataObj.getMinutes()).padStart(2, '0')
+        const nomeCliente = details.cliente_nome || 'Cliente'
+
+        const msg = `❌ *Agendamento Cancelado*\n\n👤 Cliente: *${nomeCliente}*\n📅 Data: *${dia}/${mes}*\n⏰ Horário: *${hora}:${min}*\n\nO horário está livre novamente.`
+        
+        console.log(`[CancelNotification] Enviando para ${barberData.nome} (${barberData.telefone})...`)
+        // AWAIT IMPORTANTE
+        await sendWhatsAppNotification({
+          phone: barberData.telefone,
+          message: msg
+        })
+      } else {
+        console.warn(`[CancelNotification] Barbeiro ${details.barbeiro_id} sem telefone.`)
+      }
+    }
+  } catch (err) {
+    // Erro de notificação não deve falhar o cancelamento no banco, apenas logar
+    console.error('[CancelNotification] Falha ao notificar cancelamento:', err)
+  }
 
   // 7. Revalida a pagina para refletir o novo status sem reload manual
   revalidatePath('/meus-agendamentos')
