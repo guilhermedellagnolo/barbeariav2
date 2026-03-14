@@ -511,19 +511,18 @@ export async function cancelAppointment(appointmentId: string) {
     throw updateError
   }
 
-  // ─── Notificação WhatsApp (Cancelamento - Simplificado) ───────────────────────
-  (async () => {
-    try {
-      // 1. Busca dados básicos do agendamento (incluindo ID do barbeiro)
-      const { data: agendamento } = await supabase
-        .from('agendamentos')
-        .select('barbeiro_id, cliente_nome, data_hora')
-        .eq('id', appointmentId)
-        .single()
+  // ─── Notificação WhatsApp (Cancelamento - Síncrono) ───────────────────────────
+  // Aguarda o envio para garantir que a mensagem saia antes da página recarregar.
+  try {
+    // 1. Busca dados básicos do agendamento (incluindo ID do barbeiro)
+    const { data: agendamento } = await supabase
+      .from('agendamentos')
+      .select('barbeiro_id, cliente_nome, data_hora')
+      .eq('id', appointmentId)
+      .single()
 
-      if (!agendamento) return
-
-      // 2. Busca telefone do barbeiro separadamente (igual ao createAppointment)
+    if (agendamento) {
+      // 2. Busca telefone do barbeiro separadamente
       const { data: barberData } = await supabase
         .from('barbeiros')
         .select('telefone, nome')
@@ -542,6 +541,7 @@ export async function cancelAppointment(appointmentId: string) {
         const msg = `❌ *Agendamento Cancelado*\n\n👤 Cliente: *${nomeCliente}*\n📅 Data: *${dia}/${mes}*\n⏰ Horário: *${hora}:${min}*\n\nO horário está livre novamente.`
         
         console.log(`[CancelNotification] Enviando para ${barberData.nome} (${barberData.telefone})...`)
+        // AWAIT IMPORTANTE: Garante o envio antes do retorno da função
         await sendWhatsAppNotification({
           phone: barberData.telefone,
           message: msg
@@ -549,10 +549,11 @@ export async function cancelAppointment(appointmentId: string) {
       } else {
         console.warn(`[CancelNotification] Barbeiro ${agendamento.barbeiro_id} sem telefone.`)
       }
-    } catch (err) {
-      console.error('[CancelNotification] Falha ao notificar cancelamento:', err)
     }
-  })()
+  } catch (err) {
+    // Erro de notificação não deve falhar o cancelamento no banco, apenas logar
+    console.error('[CancelNotification] Falha ao notificar cancelamento:', err)
+  }
 }
 
 export async function ensureClientExists(
