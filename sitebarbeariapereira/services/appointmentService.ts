@@ -511,42 +511,43 @@ export async function cancelAppointment(appointmentId: string) {
     throw updateError
   }
 
-  // ─── Notificação WhatsApp (Cancelamento) ──────────────────────────────────────
+  // ─── Notificação WhatsApp (Cancelamento - Simplificado) ───────────────────────
   (async () => {
     try {
-      // Busca detalhes para a mensagem
-      const { data: details } = await supabase
+      // 1. Busca dados básicos do agendamento (incluindo ID do barbeiro)
+      const { data: agendamento } = await supabase
         .from('agendamentos')
-        .select(`
-          data_hora,
-          cliente_nome,
-          barbeiros (nome, telefone)
-        `)
+        .select('barbeiro_id, cliente_nome, data_hora')
         .eq('id', appointmentId)
         .single()
-        
-      // TypeScript safety: details.barbeiros pode ser array ou objeto dependendo do tipo
-      // Mas com .single() no select aninhado, o Supabase retorna objeto se a relação for 1:1 ou N:1.
-      // Precisamos garantir acesso seguro e tipagem correta.
-      // @ts-ignore
-      const barbeiro = Array.isArray(details?.barbeiros) ? details.barbeiros[0] : details?.barbeiros
 
-      if (barbeiro?.telefone && details?.data_hora) {
-        // Conversão segura de data
-        const dataObj = new Date(details.data_hora)
+      if (!agendamento) return
+
+      // 2. Busca telefone do barbeiro separadamente (igual ao createAppointment)
+      const { data: barberData } = await supabase
+        .from('barbeiros')
+        .select('telefone, nome')
+        .eq('id', agendamento.barbeiro_id)
+        .single()
+
+      if (barberData?.telefone) {
+        // 3. Monta mensagem
+        const dataObj = new Date(agendamento.data_hora)
         const dia = String(dataObj.getDate()).padStart(2, '0')
         const mes = String(dataObj.getMonth() + 1).padStart(2, '0')
         const hora = String(dataObj.getHours()).padStart(2, '0')
         const min = String(dataObj.getMinutes()).padStart(2, '0')
-        const nomeCliente = details.cliente_nome || 'Cliente'
+        const nomeCliente = agendamento.cliente_nome || 'Cliente'
 
         const msg = `❌ *Agendamento Cancelado*\n\n👤 Cliente: *${nomeCliente}*\n📅 Data: *${dia}/${mes}*\n⏰ Horário: *${hora}:${min}*\n\nO horário está livre novamente.`
         
-        console.log(`[CancelNotification] Enviando para ${barbeiro.nome}...`)
+        console.log(`[CancelNotification] Enviando para ${barberData.nome} (${barberData.telefone})...`)
         await sendWhatsAppNotification({
-          phone: barbeiro.telefone,
+          phone: barberData.telefone,
           message: msg
         })
+      } else {
+        console.warn(`[CancelNotification] Barbeiro ${agendamento.barbeiro_id} sem telefone.`)
       }
     } catch (err) {
       console.error('[CancelNotification] Falha ao notificar cancelamento:', err)
