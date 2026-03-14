@@ -3,6 +3,7 @@
 // IMPORTANTE: NÃO usar singleton de módulo — createClient() é chamado por função
 // para evitar estado stale entre hot-reloads do Next.js e re-uso de conexão cacheada.
 import { createClient } from '@/lib/supabase/client'
+import { sendWhatsAppNotification } from '@/lib/uazapi'
 
 /** @deprecated Use barbeariaId passado via prop (resolvido pelo middleware). Mantido apenas como fallback interno. */
 export const BARBERSHOP_ID = process.env.NEXT_PUBLIC_BARBEARIA_ID || 'fc398d1d-9c4e-4a93-9d45-8ebbaa1cf39a'
@@ -443,6 +444,38 @@ export async function createAppointment(
       message: 'Erro ao realizar o agendamento. Tente novamente.',
     }
   }
+
+  // ─── Notificação WhatsApp (Fire-and-forget) ──────────────────────────────────
+  // Não aguarda o envio para não travar a resposta da UI.
+  // Busca telefone do barbeiro para notificar
+  (async () => {
+    try {
+      // 1. Busca dados do barbeiro (telefone)
+      const { data: barberData } = await supabase
+        .from('barbeiros')
+        .select('telefone, nome')
+        .eq('id', barberId)
+        .single()
+
+      if (barberData?.telefone) {
+        // 2. Monta mensagem
+        const [ano, mes, dia] = date.split('-')
+        const dataFormatada = `${dia}/${mes}/${ano}`
+        const msg = `✂️ *Novo Agendamento*\n\n👤 Cliente: *${clientName}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${time}*\n📱 Contato: ${clientPhone}`
+        
+        // 3. Envia
+        console.log(`[Notification] Enviando para ${barberData.nome} (${barberData.telefone})...`)
+        await sendWhatsAppNotification({
+          phone: barberData.telefone,
+          message: msg
+        })
+      } else {
+        console.warn(`[Notification] Barbeiro ${barberId} sem telefone cadastrado.`)
+      }
+    } catch (err) {
+      console.error('[Notification] Falha ao notificar barbeiro:', err)
+    }
+  })()
 
   return { success: true }
 }
