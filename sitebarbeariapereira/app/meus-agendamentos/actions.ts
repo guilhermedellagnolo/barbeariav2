@@ -126,15 +126,25 @@ export async function cancelarAgendamento(agendamentoId: string) {
         .single()
 
       if (barberData?.telefone) {
-        // 3. Monta mensagem
+        // 3. Monta mensagem com fuso horário correto (America/Sao_Paulo)
         const dataObj = new Date(details.data_hora)
-        const dia = String(dataObj.getDate()).padStart(2, '0')
-        const mes = String(dataObj.getMonth() + 1).padStart(2, '0')
-        const hora = String(dataObj.getHours()).padStart(2, '0')
-        const min = String(dataObj.getMinutes()).padStart(2, '0')
+        
+        // Formata data e hora usando Intl para garantir o fuso correto (-3h)
+        const dataFormatada = dataObj.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          timeZone: 'America/Sao_Paulo'
+        })
+        
+        const horaFormatada = dataObj.toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'America/Sao_Paulo'
+        })
+
         const nomeCliente = details.cliente_nome || 'Cliente'
 
-        const msg = `❌ *Agendamento Cancelado*\n\n👤 Cliente: *${nomeCliente}*\n📅 Data: *${dia}/${mes}*\n⏰ Horário: *${hora}:${min}*\n\nO horário está livre novamente.`
+        const msg = `❌ *Agendamento Cancelado*\n\n👤 Cliente: *${nomeCliente}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${horaFormatada}*\n\nO horário está livre novamente.`
         
         console.log(`[CancelNotification] Enviando para ${barberData.nome} (${barberData.telefone})...`)
         // AWAIT IMPORTANTE
