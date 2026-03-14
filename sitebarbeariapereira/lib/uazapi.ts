@@ -24,15 +24,22 @@ export async function sendWhatsAppNotification({ phone, message }: SendMessagePr
   try {
     // Endpoint correto da Uazapi/Evolution API v1.x/v2.x
     // Ajuste para evitar erro 405 (Method Not Allowed)
-    const response = await fetch(`${UAZAPI_URL}/message/text?key=barbearias`, {
+    const response = await fetch(`${UAZAPI_URL}/message/sendText/barbearias`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${UAZAPI_TOKEN}`, // Uazapi geralmente usa Bearer Token no header Authorization
+        'apikey': UAZAPI_TOKEN,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        id: cleanPhone,
-        message: message,
+        number: cleanPhone,
+        options: {
+          delay: 1000,
+          presence: "composing",
+          linkPreview: false
+        },
+        textMessage: {
+          text: message
+        }
       }),
     })
 
