@@ -445,35 +445,56 @@ export async function createAppointment(
     }
   }
 
-  // ─── Notificação WhatsApp (Fire-and-forget) ──────────────────────────────────
+  // ─── Notificações WhatsApp (Fire-and-forget, Paralelo) ───────────────────────
   // Não aguarda o envio para não travar a resposta da UI.
-  // Busca telefone do barbeiro para notificar
   (async () => {
     try {
-      // 1. Busca dados do barbeiro (telefone)
-      const { data: barberData } = await supabase
-        .from('barbeiros')
-        .select('telefone, nome')
-        .eq('id', barberId)
-        .single()
+      // 1. Busca dados do barbeiro (telefone e nome) e dados da barbearia (nome) para a mensagem do cliente
+      const [barberResponse, barbeariaResponse] = await Promise.all([
+        supabase.from('barbeiros').select('telefone, nome').eq('id', barberId).single(),
+        supabase.from('barbearias').select('nome').eq('id', barbershopId).single()
+      ])
 
+      const barberData = barberResponse.data
+      const barbeariaNome = barbeariaResponse.data?.nome || 'Nossa Barbearia'
+
+      // 2. Formata a data e hora recebidas (date: YYYY-MM-DD, time: HH:mm)
+      // Como aqui os parâmetros vêm direto do input do usuário (já no fuso local), não precisamos de Intl
+      const [ano, mes, dia] = date.split('-')
+      const dataFormatada = `${dia}/${mes}/${ano}`
+
+      const promessas = []
+
+      // 3. Monta e agenda a mensagem para o Barbeiro
       if (barberData?.telefone) {
-        // 2. Monta mensagem
-        const [ano, mes, dia] = date.split('-')
-        const dataFormatada = `${dia}/${mes}/${ano}`
-        const msg = `✂️ *Novo Agendamento*\n\n👤 Cliente: *${clientName}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${time}*\n📱 Contato: ${clientPhone}`
-        
-        // 3. Envia
-        console.log(`[Notification] Enviando para ${barberData.nome} (${barberData.telefone})...`)
-        await sendWhatsAppNotification({
-          phone: barberData.telefone,
-          message: msg
-        })
+        const msgBarbeiro = `✂️ *Novo Agendamento*\n\n👤 Cliente: *${clientName}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${time}*\n📱 Contato: ${clientPhone}`
+        console.log(`[Notification] Agendando envio para barbeiro ${barberData.nome}...`)
+        promessas.push(sendWhatsAppNotification({ phone: barberData.telefone, message: msgBarbeiro }))
       } else {
         console.warn(`[Notification] Barbeiro ${barberId} sem telefone cadastrado.`)
       }
+
+      // 4. Monta e agenda a mensagem para o Cliente
+      if (clientPhone) {
+        // Pega apenas o primeiro nome do cliente para ficar mais amigável
+        const primeiroNome = clientName.split(' ')[0]
+        const msgCliente = `Olá, *${primeiroNome}*! 👋\n\nSeu agendamento na *${barbeariaNome}* foi confirmado com sucesso!\n\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${time}*\n✂️ Profissional: *${barberData?.nome || 'nossa equipe'}*\n\nCaso precise cancelar, pedimos que acesse nosso site com até 2h de antecedência. Te esperamos lá!`
+        console.log(`[Notification] Agendando envio para cliente ${primeiroNome}...`)
+        promessas.push(sendWhatsAppNotification({ phone: clientPhone, message: msgCliente }))
+      }
+
+      // 5. Executa todas as notificações em paralelo de forma segura
+      if (promessas.length > 0) {
+        const resultados = await Promise.allSettled(promessas)
+        resultados.forEach((res, index) => {
+          if (res.status === 'rejected') {
+            console.error(`[Notification] Falha no envio da notificação index ${index}:`, res.reason)
+          }
+        })
+      }
+
     } catch (err) {
-      console.error('[Notification] Falha ao notificar barbeiro:', err)
+      console.error('[Notification] Falha geral ao processar notificações:', err)
     }
   })()
 
