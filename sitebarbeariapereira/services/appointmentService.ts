@@ -510,6 +510,48 @@ export async function cancelAppointment(appointmentId: string) {
   if (updateError) {
     throw updateError
   }
+
+  // ─── Notificação WhatsApp (Cancelamento) ──────────────────────────────────────
+  (async () => {
+    try {
+      // Busca detalhes para a mensagem
+      const { data: details } = await supabase
+        .from('agendamentos')
+        .select(`
+          data_hora,
+          cliente_nome,
+          barbeiros (nome, telefone)
+        `)
+        .eq('id', appointmentId)
+        .single()
+        
+      // TypeScript safety: details.barbeiros pode ser array ou objeto dependendo do tipo
+      // Mas com .single() no select aninhado, o Supabase retorna objeto se a relação for 1:1 ou N:1.
+      // Precisamos garantir acesso seguro e tipagem correta.
+      // @ts-ignore
+      const barbeiro = Array.isArray(details?.barbeiros) ? details.barbeiros[0] : details?.barbeiros
+
+      if (barbeiro?.telefone && details?.data_hora) {
+        // Conversão segura de data
+        const dataObj = new Date(details.data_hora)
+        const dia = String(dataObj.getDate()).padStart(2, '0')
+        const mes = String(dataObj.getMonth() + 1).padStart(2, '0')
+        const hora = String(dataObj.getHours()).padStart(2, '0')
+        const min = String(dataObj.getMinutes()).padStart(2, '0')
+        const nomeCliente = details.cliente_nome || 'Cliente'
+
+        const msg = `❌ *Agendamento Cancelado*\n\n👤 Cliente: *${nomeCliente}*\n📅 Data: *${dia}/${mes}*\n⏰ Horário: *${hora}:${min}*\n\nO horário está livre novamente.`
+        
+        console.log(`[CancelNotification] Enviando para ${barbeiro.nome}...`)
+        await sendWhatsAppNotification({
+          phone: barbeiro.telefone,
+          message: msg
+        })
+      }
+    } catch (err) {
+      console.error('[CancelNotification] Falha ao notificar cancelamento:', err)
+    }
+  })()
 }
 
 export async function ensureClientExists(
