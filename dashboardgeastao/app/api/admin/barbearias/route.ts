@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
               foto_url: b.foto_url || null,
               ativo: b.ativo ?? true,
               usuario_id: emailToUserId.get(b.email) || null,
+              telefone: b.telefone || null,
             }))
           )
           .select("id, usuario_id")
@@ -288,7 +289,7 @@ export async function GET() {
     // 2. Barbeiros (1 query)
     const { data: allBarbeiros } = await supabase
       .from("barbeiros")
-      .select("id, barbearia_id, nome, foto_url, ativo, usuario_id")
+      .select("id, barbearia_id, nome, foto_url, ativo, usuario_id, telefone")
       .in("barbearia_id", ids)
 
     // 2.1 Buscar emails dos auth users vinculados
@@ -350,6 +351,7 @@ export async function GET() {
         foto_url: b.foto_url || "",
         ativo: b.ativo ?? true,
         email: b.usuario_id ? (emailByUserId[b.usuario_id] || "") : "",
+        telefone: b.telefone || "",
       })),
       total_agendamentos: countByBarb[row.id] || 0,
     }))
@@ -385,7 +387,8 @@ async function syncBarbeiros(supabase: any, barbeariaId: string, barbeiros: any[
         nome: b.nome,
         foto_url: b.foto_url || null,
         ativo: b.ativo,
-        usuario_id: emailToUserId.get(b.email) || null // Vincula usuario_id recém-criado
+        usuario_id: emailToUserId.get(b.email) || null, // Vincula usuario_id recém-criado
+        telefone: b.telefone || null,
       }))
     ).select("id")
 
@@ -412,7 +415,7 @@ async function syncBarbeiros(supabase: any, barbeariaId: string, barbeiros: any[
   for (const b of toUpdate) {
     await supabase
       .from("barbeiros")
-      .update({ nome: b.nome, foto_url: b.foto_url || null, ativo: b.ativo })
+      .update({ nome: b.nome, foto_url: b.foto_url || null, ativo: b.ativo, telefone: b.telefone || null })
       .eq("id", b.id)
 
     // Se veio nova senha, atualizar no auth
